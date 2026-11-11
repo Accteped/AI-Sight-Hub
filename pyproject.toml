@@ -1,0 +1,13 @@
+[project]
+name = "ai-insight-hub"
+version = "0.1.0"
+requires-python = ">=3.10"
+
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "httpx",
+    "pydantic",
+    "beautifulsoup4",
+    "trafilatura",
+]
