@@ -221,9 +221,9 @@ class Store:
         return sorted(tag_return, key=lambda x: x['count'], reverse=True)
 if __name__ == "__main__":
     store = Store("test.db", "test_table")
-    #store.add("title2", "summary2", "content2", "url2", "model2", "provider2", "category2", '["tag2","tag3"]')
-    #store.add("title3", "summary3", "content3", "url3", "model3", "provider3", "category1", '["tag1","tag3"]')
-    #print(store.get(1))
+    store.add("title2", "summary2", "content2", "url2", "model2", "provider2", "category2", '["tag2","tag3"]')
+    store.add("title3", "summary3", "content3", "url3", "model3", "provider3", "category1", '["tag1","tag3"]')
+    print(store.get(1))
     print(store.list("content", "category1", "tag1", 2))
     #store.set_status(1, "done")
     #store.save_content(1, "new content", "new title")

@@ -1,4 +1,5 @@
 import json
+import re
 from abc import ABC, abstractmethod
 
 def decode_to_json(message):
@@ -39,42 +40,28 @@ class LLMClient(ABC):
         raw = self.complete(system, user, temperature)
         json_code = decode_to_json(raw)
         return json_code
-
+#本地备用处理方案
 class MockClient(LLMClient):
     name = 'mock'
     model = 'mock-rules-v1'
 
     def complete(self, system, user, temperature=None) -> str:
-        #title匹配
-        title = ''
-        summary = user
+        #title,summary,tags,category初始化
+        split_dot = re.split(r'[。.]', user)
+        title = split_dot[0]
         tags = []
-        category = "其他"
-        count_end = 0
-        start = 0
-        count_split = 1
-        for index in range(len(user)):
-            if user[index] == '。':
-                
-                count_split = count_split + 1
-                count_end = count_end + 1
-                if count_end == 1:
-                    title = user[:(index)]
-                if count_end == 3:
-                    summary = user[:(index+1)]
-                if count_split == 1:
-                    start = index + 1
-            if user[index] == ' ':
-                count_split = count_split + 1
-                if count_split == 1:
-                    start = index + 1
-            if count_split == 2:
-                count_split = 0
-                if len(user[start:index]) < 2 or len(user[start:index]) > 10:
-                    start = None
+        if len(split_dot) < 3:
+            summary = user
+        else:
+            summary = split_dot[0] + '。' + split_dot[1] + '。' + split_dot[2]
+        split_all = re.split(r'[.。、，,]', user)
+        for words in split_all:
+            split_word = words.split(' ')
+            for word in split_word:
+                if len(word) < 2 or len(word) > 10:
                     continue
-                tags.append(user[start:index])
-                start = None
+                tags.append(word)
+        category = "其他"
         if 'python' in user or '代码' in user or '框架' in user:
             category = "技术/编程"
         return json.dumps({
@@ -84,5 +71,25 @@ class MockClient(LLMClient):
         "category": category
         }, ensure_ascii=False)
 
-t = MockClient()
-print(t.json("系统",'FastAPI 是一个现代 Python Web 框架。它基于类型提示构建。适合快速开发 AI 应用。'))
+class OpenAICompatClient(LLMClient):
+    def __init__(self, config):
+        pass
+    def complete(self, system, user, temperature=None):
+        pass
+
+class OllamaClient(LLMClient):
+    def __init__(self, config):
+        pass
+    def complete(self, system, user, temperature=None):
+        pass
+
+def build_client(CONFIG):
+    provider = CONFIG.LLM_PROVIDER
+    if provider == 'mock':
+        return MockClient()
+    elif provider == 'openai':
+        return OpenAICompatClient(config=CONFIG)
+    elif provider == 'ollama':
+        return OllamaClient(config=CONFIG)
+    else:
+        raise ValueError('不存在该配置的模型')
