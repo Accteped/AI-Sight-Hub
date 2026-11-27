@@ -1,0 +1,13 @@
+标题title
+摘要summary
+原文content
+地址url
+模型model,provider
+类别category
+标签tags ---------------------->json
+id
+按时间排序create_at,update_at
+状态status            pending / fetching / analyzing / done / failed
+错误error
+来源source
+关键词keywords----------------->json

@@ -34,7 +34,7 @@ class Store:
         conn.commit()
         conn.close()
     #新增一条行
-    def add(self, title, summary, content, url, model, provider, category, tags, status='pending', error=None, source=None, keywords=None):
+    def add(self, title = '', summary = '', content = '', url = '', model = '', provider = '', category = '其他', status='pending', keywords='[]', tags = '[]', error=None, source=None):
         conn_a = sqlite3.connect(self.db_path)
         try:
             conn_a.execute(f"INSERT INTO {self.dbtb_name} (title, summary, content, url, model, provider, category, tags, status, error, source, keywords) "
@@ -47,7 +47,7 @@ class Store:
         conn_a.commit()
         conn_a.close()
         return id
-    #根据id获取对应行，返回格式为Item
+    #根据id获取对应行，返回格式为dict
     def get(self, id):
         conn_g = sqlite3.connect(self.db_path)
         try:

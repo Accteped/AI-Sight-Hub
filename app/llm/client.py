@@ -30,7 +30,7 @@ def decode_to_json(message):
                 raise ValueError("模型输出中没有 JSON")
         else:
             raise ValueError("模型输出中没有 JSON")
-
+#抽象类，json表示把系统和用户提示词合并
 class LLMClient(ABC):
     @abstractmethod
     def complete(self, system, user, temperature = None) -> str:
@@ -54,11 +54,11 @@ class MockClient(LLMClient):
             summary = user
         else:
             summary = split_dot[0] + '。' + split_dot[1] + '。' + split_dot[2]
-        split_all = re.split(r'[.。、，,]', user)
+        split_all = re.split(r'[.。]', user)
         for words in split_all:
             split_word = words.split(' ')
             for word in split_word:
-                if len(word) < 2 or len(word) > 10:
+                if len(word) < 3 or len(word) > 10:
                     continue
                 tags.append(word)
         category = "其他"
