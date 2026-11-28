@@ -17,16 +17,16 @@
   --text-2:      #9aa4bf;
   --text-muted:  #666d85;
 
-  /* 界面强调色：霓虹青，科技感的核心色 */
-  --accent:      #22d3ee;
-  --accent-2:    #0ea5e9;
-  --accent-ink:  #cffafe;
+  /* 界面强调色：沉静的青灰，不再用刺眼的霓虹青 */
+  --accent:      #6d9fc4;
+  --accent-2:    #5b8aad;
+  --accent-ink:  #d6e8f5;
 
-  /* 背景：深空 + 光晕 */
+  /* 背景：深空 + 微弱光晕 */
   --page-gradient:
-    radial-gradient(1000px 600px at 10% -12%, rgba(34, 211, 238, 0.10), transparent 60%),
-    radial-gradient(820px 520px at 92% 6%, rgba(139, 92, 246, 0.09), transparent 58%),
-    radial-gradient(1200px 700px at 50% 115%, rgba(14, 165, 233, 0.06), transparent 62%),
+    radial-gradient(1000px 600px at 10% -12%, rgba(109, 159, 196, 0.09), transparent 60%),
+    radial-gradient(820px 520px at 92% 6%, rgba(146, 137, 171, 0.07), transparent 58%),
+    radial-gradient(1200px 700px at 50% 115%, rgba(109, 159, 196, 0.05), transparent 62%),
     linear-gradient(170deg, #0b0c15 0%, #0f1119 50%, #12141f 100%);
 
   --ok:          #34d399;
@@ -40,17 +40,17 @@
   --line:        rgba(255, 255, 255, 0.06);
   --line-strong: rgba(255, 255, 255, 0.11);
 
-  /* 资料彩色：高饱和霓虹色，每条按 id 哈希取一个 */
-  --c1: #38bdf8;   /* 天蓝 */
-  --c2: #a855f7;   /* 紫 */
-  --c3: #ec4899;   /* 玫红 */
-  --c4: #f43f5e;   /* 红 */
-  --c5: #f97316;   /* 橙 */
-  --c6: #eab308;   /* 黄 */
-  --c7: #22c55e;   /* 绿 */
-  --c8: #14b8a6;   /* 青绿 */
-  --c9: #06b6d4;   /* 青 */
-  --c10: #6366f1;  /* 靛 */
+  /* 资料彩色：莫兰迪浊色调 —— 降饱和、掺灰，沉稳不刺眼 */
+  --c1: #7d9bb5;   /* 雾蓝 */
+  --c2: #9289ab;   /* 灰紫 */
+  --c3: #b48593;   /* 藕粉 */
+  --c4: #b07a7a;   /* 陶红 */
+  --c5: #c08a63;   /* 赭石 */
+  --c6: #b99a5b;   /* 芥末 */
+  --c7: #7d9e83;   /* 苍绿 */
+  --c8: #6f9c98;   /* 灰青 */
+  --c9: #7796a8;   /* 石板蓝 */
+  --c10: #8a8bb0;  /* 灰靛 */
 
   --r-sm: 5px;
   --r-md: 9px;
@@ -61,7 +61,8 @@
   --t-fast: 140ms;
   --t-mid: 220ms;
 
-  --font: "Inter", -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+  --font: "Inter", "Noto Sans SC", -apple-system, "Segoe UI", "PingFang SC",
+          "Microsoft YaHei", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
 }
 
@@ -91,15 +92,14 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  /* 网格 + 渐变：网格是"数据结构"的视觉隐喻，
-     越往上越淡，形成深度 */
+  /* 网格 + 渐变：极淡的结构感，不喧宾夺主 */
   background-image:
-    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(rgba(255, 255, 255, 0.014) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.014) 1px, transparent 1px),
     var(--page-gradient);
-  background-size: 44px 44px, 44px 44px, 100% 100%;
-  mask-image: linear-gradient(180deg, #000 0%, #000 42%, transparent 92%);
-  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 42%, transparent 92%);
+  background-size: 48px 48px, 48px 48px, 100% 100%;
+  mask-image: linear-gradient(180deg, #000 0%, #000 38%, transparent 88%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 38%, transparent 88%);
 }
 
 button, input, textarea { font: inherit; color: inherit; }
@@ -178,19 +178,19 @@ button, input, textarea { font: inherit; color: inherit; }
   gap: 8px;
 }
 
-/* 这一屏唯一的大数字：青蓝渐变 + 辉光，像一块仪表盘读数 */
+/* 这一屏唯一的大数字：清冷的白到青灰渐变，弱辉光 */
 .hero-number {
   font-size: 46px;
   line-height: 1;
-  font-weight: 600;
+  font-weight: 500;
   letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(165deg, #ffffff 0%, #a5f3fc 40%, var(--accent) 100%);
+  background: linear-gradient(165deg, #ffffff 0%, #cfe3f0 45%, var(--accent) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
-  filter: drop-shadow(0 0 14px rgba(34, 211, 238, 0.42));
+  filter: drop-shadow(0 0 10px rgba(109, 159, 196, 0.28));
 }
 
 .hero-label {
@@ -487,25 +487,24 @@ button, input, textarea { font: inherit; color: inherit; }
 }
 
 .btn--primary {
-  /* 霓虹青渐变 + 强辉光：科技感的核心动作按钮 */
-  background: linear-gradient(150deg, #67e8f9 0%, var(--accent) 45%, #0891b2 100%);
-  border-color: rgba(34, 211, 238, 0.6);
-  color: #05161c;
-  font-weight: 600;
+  /* 沉稳的青灰渐变 + 柔和内高光 */
+  background: linear-gradient(150deg, #8ab8d4 0%, var(--accent) 48%, #4f7d9c 100%);
+  border-color: rgba(109, 159, 196, 0.5);
+  color: #0a1620;
+  font-weight: 500;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.5),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
-    0 2px 14px rgba(34, 211, 238, 0.42);
+    inset 0 1px 0 rgba(255, 255, 255, 0.35),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 2px 10px rgba(109, 159, 196, 0.22);
 }
 
 .btn--primary:hover {
-  background: linear-gradient(150deg, #7ff0ff 0%, #33dcf5 45%, #0aa9cb 100%);
-  border-color: rgba(34, 211, 238, 0.8);
+  background: linear-gradient(150deg, #9ac4de 0%, #7aabd0 48%, #5b8aad 100%);
+  border-color: rgba(109, 159, 196, 0.68);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.58),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
-    0 4px 22px rgba(34, 211, 238, 0.55),
-    0 0 32px rgba(34, 211, 238, 0.24);
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.14),
+    0 4px 16px rgba(109, 159, 196, 0.30);
 }
 
 .btn--ghost {
@@ -801,20 +800,18 @@ button, input, textarea { font: inherit; color: inherit; }
     0 0 0 1px var(--cat-line, transparent);
 }
 
-/* 签名细节：左侧发光色带 —— 每条资料自己的霓虹色 */
+/* 签名细节：左侧色带 —— 每条资料自己的浊色，克制而清晰 */
 .card::before {
   content: "";
   position: absolute;
   top: 0;
   bottom: 0;
   left: 0;
-  width: 4px;
+  width: 3px;
   background: var(--cat, var(--raised-2));
-  box-shadow: 0 0 10px var(--cat-line, transparent);
-  opacity: 0.95;
+  opacity: 0.85;
   transition: width var(--t-fast) var(--ease),
-              opacity var(--t-fast) var(--ease),
-              box-shadow var(--t-mid) var(--ease);
+              opacity var(--t-fast) var(--ease);
 }
 
 .card:hover::before {
