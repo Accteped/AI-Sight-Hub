@@ -1,6 +1,7 @@
 import json
 import re
 from abc import ABC, abstractmethod
+import httpx
 
 def decode_to_json(message):
     msg = ''
@@ -68,15 +69,44 @@ class MockClient(LLMClient):
         "title": title,
         "summary": summary,
         "tags": tags,
-        "category": category
+        "category": category,
+        "keywords": []
         }, ensure_ascii=False)
 
 class OpenAICompatClient(LLMClient):
+    name = 'openai-compat'
+    model = None
     def __init__(self, config):
-        pass
+        self.config = config
+        self.model = config.LLM_MODEL
     def complete(self, system, user, temperature=None):
-        pass
-
+        if not self.config.LLM_API_KEY:
+                    raise ValueError("请先配置API KEY")
+        if temperature is None:
+            temperature = self.config.LLM_TEMPERATURE
+        url = self.config.LLM_BASE_URL.rstrip('/') + '/chat/completions'
+        model = self.model
+        respond = httpx.post(url,
+                headers={'Authorization': f'Bearer {self.config.LLM_API_KEY}'},
+                json={'model': model,
+                    'messages': [
+                        {'role': 'system', 'content': system},
+                        {'role': 'user', 'content': user}],
+                    'temperature': temperature},
+                timeout=self.config.LLM_TIMEOUT)
+        if respond.status_code >= 400:
+            error = respond.text[:500]
+            raise RuntimeError(f"调用模型失败({respond.status_code}) : {error}")
+        text = respond.json()
+        try:
+            choices = text["choices"][0]["message"]
+            content = choices.get("content", None)
+        except Exception as e:
+            content = None
+        if not content:
+            raise ValueError(f"模型返回内容为空或不存在需要内容{respond.json()}，状态码:{respond.status_code}")
+        return content
+#本地模型类
 class OllamaClient(LLMClient):
     def __init__(self, config):
         pass
