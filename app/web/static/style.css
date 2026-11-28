@@ -1,50 +1,61 @@
 /* ============================================================
    AI Insight Hub — 样式
-   深蓝灰底 + 冷调青蓝强调；质感来自光而非装饰
+   中性深底 + 每条资料自己的颜色（按 id 哈希分配）
+   颜色在内容上，不在背景上
    ============================================================ */
 
 :root {
-  /* 深色阶：蓝灰而非纯黑，暗部有空气感，卡片才浮得起来 */
-  --bg-deep:     #161820;
-  --bg:          #1a1d25;
-  --surface:     #21252f;
-  --raised:      #2a2f3a;
-  --raised-2:    #343a47;
-  --raised-3:    #404757;
+  /* 中性深底：带极轻的紫蓝倾向，不抢内容颜色的戏 */
+  --bg-deep:     #14131a;
+  --bg:          #1a1923;
+  --surface:     #21202c;
+  --raised:      #2b2a38;
+  --raised-2:    #373547;
+  --raised-3:    #454358;
 
-  /* 文本三角色 */
-  --text:        #eef1f6;
-  --text-2:      #a8b0c0;
-  --text-muted:  #737d90;
+  --text:        #f0eef8;
+  --text-2:      #adaac0;
+  --text-muted:  #787588;
 
-  /* 强调色：冷调青蓝，用于主行动 / 选中 / 关键数字 */
-  --accent:      #63b3ee;
-  --accent-2:    #8b8bf0;
-  --accent-ink:  #dcefff;
+  /* 界面强调色：中性偏冷，不与资料的彩色冲突 */
+  --accent:      #8b8bf5;
+  --accent-2:    #a78bfa;
+  --accent-ink:  #ece9ff;
 
-  /* 光晕 */
-  --glow-1:      rgba(99, 179, 238, 0.16);
-  --glow-2:      rgba(139, 139, 240, 0.11);
+  /* 背景：极克制的两团光，不抢内容 */
+  --page-gradient:
+    radial-gradient(900px 560px at 6% -10%, rgba(139, 139, 245, 0.10), transparent 60%),
+    radial-gradient(760px 480px at 96% 4%, rgba(167, 139, 250, 0.07), transparent 58%),
+    linear-gradient(170deg, #16151d 0%, #1a1923 50%, #1e1c28 100%);
 
-  /* 语义色 */
-  --ok:          #56d19a;
-  --ok-soft:     rgba(86, 209, 154, 0.15);
-  --err:         #f2686e;
-  --err-soft:    rgba(242, 104, 110, 0.14);
-  --warn:        #e8b355;
-  --warn-soft:   rgba(232, 179, 85, 0.14);
+  --ok:          #4ade80;
+  --err:         #fb7185;
+  --warn:        #fbbf24;
 
-  /* 细线：蓝灰底上白线要更淡，否则显得生硬 */
-  --line:        rgba(255, 255, 255, 0.06);
-  --line-strong: rgba(255, 255, 255, 0.11);
+  --ok-soft:     rgba(74, 222, 128, 0.15);
+  --err-soft:    rgba(251, 113, 133, 0.15);
+  --warn-soft:   rgba(251, 191, 36, 0.15);
 
-  /* 圆角 */
+  --line:        rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.13);
+
+  /* 资料彩色：每条按 id 哈希取一个，用于色带 / 标签 / 详情强调 */
+  --c1: #60a5fa;   /* 蓝 */
+  --c2: #a78bfa;   /* 紫 */
+  --c3: #f472b6;   /* 粉 */
+  --c4: #fb7185;   /* 玫瑰 */
+  --c5: #fb923c;   /* 橙 */
+  --c6: #fbbf24;   /* 琥珀 */
+  --c7: #4ade80;   /* 绿 */
+  --c8: #2dd4bf;   /* 青 */
+  --c9: #22d3ee;   /* 天蓝 */
+  --c10: #818cf8;  /* 靛 */
+
   --r-sm: 5px;
   --r-md: 9px;
   --r-lg: 14px;
   --r-xl: 18px;
 
-  /* 动效 */
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --t-fast: 140ms;
   --t-mid: 220ms;
@@ -72,23 +83,19 @@ body {
   text-rendering: optimizeLegibility;
 }
 
-/* 背景光晕独立成层，避免被 .app 的子元素背景盖住 */
+/* 整页渐变底色：三套方案各自定义 --page-gradient */
 body::before {
   content: "";
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  /* 克制的三层：左上一点冷蓝、右上极淡紫、底部几乎察觉不到的底光 */
-  background:
-    radial-gradient(780px 430px at 5% -12%, rgba(99, 179, 238, 0.13), transparent 58%),
-    radial-gradient(660px 390px at 98% -6%, rgba(139, 139, 240, 0.09), transparent 56%),
-    radial-gradient(1020px 640px at 48% 114%, rgba(99, 179, 238, 0.045), transparent 64%);
+  background: var(--page-gradient);
 }
 
 button, input, textarea { font: inherit; color: inherit; }
 
-::selection { background: rgba(99, 179, 238, 0.32); }
+::selection { background: var(--glow-1); }
 
 /* 滚动条 */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -220,14 +227,9 @@ button, input, textarea { font: inherit; color: inherit; }
   flex-direction: column;
   gap: 24px;
   padding: 20px 16px 16px;
-  /* 半透明深色：让背景光晕透出来一点 */
-  background: linear-gradient(
-    180deg,
-    rgba(22, 24, 32, 0.60) 0%,
-    rgba(22, 24, 32, 0.94) 55%,
-    rgba(22, 24, 32, 0.99) 100%
-  );
-  backdrop-filter: blur(14px);
+  /* 玻璃质感：用 color-mix 让侧栏永远是底色的半透明版，自动跟随主题 */
+  background: color-mix(in srgb, var(--bg-deep) 62%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
   border-right: 1px solid var(--line);
   overflow-y: auto;
 }
@@ -757,11 +759,12 @@ button, input, textarea { font: inherit; color: inherit; }
   position: relative;
   display: block;
   width: 100%;
-  padding: 16px 20px 16px 24px;
+  padding: 16px 20px 16px 26px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-lg);
-  /* 极轻的顶部提亮，让卡片像浮在背景上 */
+  /* 极轻的顶部提亮 + 左侧一抹主题色，让卡片有自己的"体温" */
   background:
+    linear-gradient(90deg, var(--cat-soft, transparent) 0%, transparent 18%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 42%),
     var(--surface);
   color: inherit;
@@ -778,30 +781,35 @@ button, input, textarea { font: inherit; color: inherit; }
 
 .card:hover {
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.012) 45%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.012) 45%),
     var(--surface);
-  border-color: var(--line-strong);
+  border-color: var(--cat-line, var(--line-strong));
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.05),
-    0 6px 18px rgba(0, 0, 0, 0.30);
+    inset 0 1px 0 rgba(255, 255, 255, 0.06),
+    0 6px 20px rgba(0, 0, 0, 0.34),
+    0 0 0 1px var(--cat-soft, transparent);
 }
 
 /* 签名细节：左侧分类色带 */
+/* 签名细节：左侧色带 —— 每条资料自己的颜色，是最醒目的识别标记 */
 .card::before {
   content: "";
   position: absolute;
-  top: 14px;
-  bottom: 14px;
-  left: -1px;
-  width: 3px;
-  border-radius: 0 3px 3px 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
   background: var(--cat, var(--raised-2));
-  opacity: 0.9;
+  opacity: 0.95;
   transition: width var(--t-fast) var(--ease),
               opacity var(--t-fast) var(--ease);
 }
 
-.card:hover::before { width: 4px; opacity: 1; }
+.card:hover::before {
+  width: 6px;
+  opacity: 1;
+  box-shadow: 0 0 12px var(--cat-soft, transparent);
+}
 
 .card[data-status="failed"] { border-color: rgba(229, 72, 77, 0.24); }
 .card[data-status="failed"]::before { background: var(--err); }
@@ -836,7 +844,8 @@ button, input, textarea { font: inherit; color: inherit; }
   font-family: var(--mono);
   font-size: 11px;
   font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
+  color: var(--cat, var(--text-muted));
+  opacity: 0.75;
 }
 
 .card-summary {
@@ -878,7 +887,12 @@ button, input, textarea { font: inherit; color: inherit; }
   white-space: nowrap;
 }
 
-.tag--cat { background: transparent; border: 1px solid var(--line-strong); }
+.tag--cat {
+  background: var(--cat-soft, transparent);
+  border: 1px solid var(--cat-line, var(--line-strong));
+  color: var(--cat, var(--text-2));
+  font-weight: 500;
+}
 
 .card-spacer { flex: 1 1 auto; }
 

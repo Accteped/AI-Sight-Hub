@@ -19,15 +19,27 @@
     failed: "失败"
   };
 
-  // 分类 → 色带。色相只出现在卡片左侧 3px 细条上，不进背景。
-  var CATEGORY_HUE = {
-    "技术/编程": "#5978b8",
-    "安全/CTF": "#b87070",
-    "产品/设计": "#a97ba8",
-    "学习/教程": "#5f9e86",
-    "生活/效率": "#b39557",
-    "其他": "#6e6e75"
-  };
+  // 资料彩色调色板：每条资料按 id 哈希稳定取色。
+  // 同一 id 永远同一个颜色，不同资料颜色各异。
+  var PALETTE = [
+    "#60a5fa", "#a78bfa", "#f472b6", "#fb7185", "#fb923c",
+    "#fbbf24", "#4ade80", "#2dd4bf", "#22d3ee", "#818cf8"
+  ];
+
+  function itemColor(id) {
+    var n = Number(id);
+    if (!isFinite(n) || n < 0) { n = 0; }
+    // 乘一个大质数再取模，让相邻 id 落到不同色相
+    return PALETTE[(n * 7 + 3) % PALETTE.length];
+  }
+
+  function hexToRgba(hex, alpha) {
+    var h = hex.replace("#", "");
+    var r = parseInt(h.substring(0, 2), 16);
+    var g = parseInt(h.substring(2, 4), 16);
+    var b = parseInt(h.substring(4, 6), 16);
+    return "rgba(" + r + ", " + g + ", " + b + ", " + alpha + ")";
+  }
 
   /* ── DOM ──────────────────────────────────────────── */
 
@@ -88,10 +100,6 @@
   // 阅读页地址：新标签页打开，渲染 Markdown + LaTeX
   function articleUrl(id) {
     return "/static/article.html?id=" + encodeURIComponent(id);
-  }
-
-  function categoryHue(cat) {
-    return CATEGORY_HUE[cat] || CATEGORY_HUE["其他"];
   }
 
   // 标签清洗：mock 模式会把原文切片当标签，需过滤代码/公式残片
@@ -388,7 +396,10 @@
     btn.target = "_blank";
     btn.rel = "noopener";
     btn.dataset.status = item.status || "pending";
-    btn.style.setProperty("--cat", categoryHue(item.category));
+    var color = itemColor(item.id);
+    btn.style.setProperty("--cat", color);
+    btn.style.setProperty("--cat-soft", hexToRgba(color, 0.14));
+    btn.style.setProperty("--cat-line", hexToRgba(color, 0.34));
     btn.style.animationDelay = Math.min(index, 6) * 40 + "ms";
 
     // 顶部：标题 + 档案编号
