@@ -1,55 +1,56 @@
 /* ============================================================
    AI Insight Hub — 样式
-   中性深底 + 每条资料自己的颜色（按 id 哈希分配）
-   颜色在内容上，不在背景上
+   深空底 + 网格结构 + 每条资料自己的发光色
+   科技感来自：网格、辉光、等宽数字、微动效
    ============================================================ */
 
 :root {
-  /* 中性深底：带极轻的紫蓝倾向，不抢内容颜色的戏 */
-  --bg-deep:     #14131a;
-  --bg:          #1a1923;
-  --surface:     #21202c;
-  --raised:      #2b2a38;
-  --raised-2:    #373547;
-  --raised-3:    #454358;
+  /* 深空底：比中性灰更深，接近太空的蓝黑 */
+  --bg-deep:     #0a0b14;
+  --bg:          #0f1119;
+  --surface:     #161925;
+  --raised:      #1e2230;
+  --raised-2:    #272c3d;
+  --raised-3:    #333a4d;
 
-  --text:        #f0eef8;
-  --text-2:      #adaac0;
-  --text-muted:  #787588;
+  --text:        #eef2ff;
+  --text-2:      #9aa4bf;
+  --text-muted:  #666d85;
 
-  /* 界面强调色：中性偏冷，不与资料的彩色冲突 */
-  --accent:      #8b8bf5;
-  --accent-2:    #a78bfa;
-  --accent-ink:  #ece9ff;
+  /* 界面强调色：霓虹青，科技感的核心色 */
+  --accent:      #22d3ee;
+  --accent-2:    #0ea5e9;
+  --accent-ink:  #cffafe;
 
-  /* 背景：极克制的两团光，不抢内容 */
+  /* 背景：深空 + 光晕 */
   --page-gradient:
-    radial-gradient(900px 560px at 6% -10%, rgba(139, 139, 245, 0.10), transparent 60%),
-    radial-gradient(760px 480px at 96% 4%, rgba(167, 139, 250, 0.07), transparent 58%),
-    linear-gradient(170deg, #16151d 0%, #1a1923 50%, #1e1c28 100%);
+    radial-gradient(1000px 600px at 10% -12%, rgba(34, 211, 238, 0.10), transparent 60%),
+    radial-gradient(820px 520px at 92% 6%, rgba(139, 92, 246, 0.09), transparent 58%),
+    radial-gradient(1200px 700px at 50% 115%, rgba(14, 165, 233, 0.06), transparent 62%),
+    linear-gradient(170deg, #0b0c15 0%, #0f1119 50%, #12141f 100%);
 
-  --ok:          #4ade80;
-  --err:         #fb7185;
+  --ok:          #34d399;
+  --err:         #f87171;
   --warn:        #fbbf24;
 
-  --ok-soft:     rgba(74, 222, 128, 0.15);
-  --err-soft:    rgba(251, 113, 133, 0.15);
-  --warn-soft:   rgba(251, 191, 36, 0.15);
+  --ok-soft:     rgba(52, 211, 153, 0.16);
+  --err-soft:    rgba(248, 113, 113, 0.16);
+  --warn-soft:   rgba(251, 191, 36, 0.16);
 
-  --line:        rgba(255, 255, 255, 0.07);
-  --line-strong: rgba(255, 255, 255, 0.13);
+  --line:        rgba(255, 255, 255, 0.06);
+  --line-strong: rgba(255, 255, 255, 0.11);
 
-  /* 资料彩色：每条按 id 哈希取一个，用于色带 / 标签 / 详情强调 */
-  --c1: #60a5fa;   /* 蓝 */
-  --c2: #a78bfa;   /* 紫 */
-  --c3: #f472b6;   /* 粉 */
-  --c4: #fb7185;   /* 玫瑰 */
-  --c5: #fb923c;   /* 橙 */
-  --c6: #fbbf24;   /* 琥珀 */
-  --c7: #4ade80;   /* 绿 */
-  --c8: #2dd4bf;   /* 青 */
-  --c9: #22d3ee;   /* 天蓝 */
-  --c10: #818cf8;  /* 靛 */
+  /* 资料彩色：高饱和霓虹色，每条按 id 哈希取一个 */
+  --c1: #38bdf8;   /* 天蓝 */
+  --c2: #a855f7;   /* 紫 */
+  --c3: #ec4899;   /* 玫红 */
+  --c4: #f43f5e;   /* 红 */
+  --c5: #f97316;   /* 橙 */
+  --c6: #eab308;   /* 黄 */
+  --c7: #22c55e;   /* 绿 */
+  --c8: #14b8a6;   /* 青绿 */
+  --c9: #06b6d4;   /* 青 */
+  --c10: #6366f1;  /* 靛 */
 
   --r-sm: 5px;
   --r-md: 9px;
@@ -90,12 +91,20 @@ body::before {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  background: var(--page-gradient);
+  /* 网格 + 渐变：网格是"数据结构"的视觉隐喻，
+     越往上越淡，形成深度 */
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.022) 1px, transparent 1px),
+    var(--page-gradient);
+  background-size: 44px 44px, 44px 44px, 100% 100%;
+  mask-image: linear-gradient(180deg, #000 0%, #000 42%, transparent 92%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 42%, transparent 92%);
 }
 
 button, input, textarea { font: inherit; color: inherit; }
 
-::selection { background: var(--glow-1); }
+::selection { background: rgba(34, 211, 238, 0.28); }
 
 /* 滚动条 */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
@@ -169,18 +178,19 @@ button, input, textarea { font: inherit; color: inherit; }
   gap: 8px;
 }
 
-/* 这一屏唯一的大数字：渐变填充，成为视觉锚点 */
+/* 这一屏唯一的大数字：青蓝渐变 + 辉光，像一块仪表盘读数 */
 .hero-number {
-  font-size: 44px;
+  font-size: 46px;
   line-height: 1;
-  font-weight: 500;
-  letter-spacing: -0.035em;
+  font-weight: 600;
+  letter-spacing: -0.04em;
   font-variant-numeric: tabular-nums;
-  background: linear-gradient(158deg, #ffffff 0%, #cfe8ff 38%, var(--accent) 100%);
+  background: linear-gradient(165deg, #ffffff 0%, #a5f3fc 40%, var(--accent) 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 14px rgba(34, 211, 238, 0.42));
 }
 
 .hero-label {
@@ -477,24 +487,25 @@ button, input, textarea { font: inherit; color: inherit; }
 }
 
 .btn--primary {
-  /* 斜向渐变 + 顶部内高光 + 投射光：有厚度，不是一块平色 */
-  background: linear-gradient(150deg, #7cc4f4 0%, var(--accent) 48%, #4d9ada 100%);
-  border-color: rgba(99, 179, 238, 0.55);
-  color: #08131d;
+  /* 霓虹青渐变 + 强辉光：科技感的核心动作按钮 */
+  background: linear-gradient(150deg, #67e8f9 0%, var(--accent) 45%, #0891b2 100%);
+  border-color: rgba(34, 211, 238, 0.6);
+  color: #05161c;
   font-weight: 600;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.16),
-    0 2px 12px rgba(99, 179, 238, 0.30);
+    inset 0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 2px 14px rgba(34, 211, 238, 0.42);
 }
 
 .btn--primary:hover {
-  background: linear-gradient(150deg, #8dcef7 0%, #6dbcF2 48%, #5aa6e2 100%);
-  border-color: rgba(99, 179, 238, 0.72);
+  background: linear-gradient(150deg, #7ff0ff 0%, #33dcf5 45%, #0aa9cb 100%);
+  border-color: rgba(34, 211, 238, 0.8);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.52),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.16),
-    0 4px 18px rgba(99, 179, 238, 0.38);
+    inset 0 1px 0 rgba(255, 255, 255, 0.58),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.18),
+    0 4px 22px rgba(34, 211, 238, 0.55),
+    0 0 32px rgba(34, 211, 238, 0.24);
 }
 
 .btn--ghost {
@@ -762,36 +773,35 @@ button, input, textarea { font: inherit; color: inherit; }
   padding: 16px 20px 16px 26px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r-lg);
-  /* 极轻的顶部提亮 + 左侧一抹主题色，让卡片有自己的"体温" */
+  /* 左侧一抹主题色 + 顶部提亮，形成"数据卡片"的层次 */
   background:
-    linear-gradient(90deg, var(--cat-soft, transparent) 0%, transparent 18%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0%, rgba(255, 255, 255, 0) 42%),
+    linear-gradient(90deg, var(--cat-soft, transparent) 0%, transparent 20%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0) 40%),
     var(--surface);
   color: inherit;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
   overflow: hidden;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.18);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.22);
   transition: background-color var(--t-fast) var(--ease),
-              border-color var(--t-fast) var(--ease),
-              box-shadow var(--t-fast) var(--ease);
+              border-color var(--t-mid) var(--ease),
+              box-shadow var(--t-mid) var(--ease),
+              transform var(--t-fast) var(--ease);
   animation: rise 320ms var(--ease) both;
 }
 
 .card:hover {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.012) 45%),
-    var(--surface);
   border-color: var(--cat-line, var(--line-strong));
+  transform: translateY(-1px);
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.06),
-    0 6px 20px rgba(0, 0, 0, 0.34),
-    0 0 0 1px var(--cat-soft, transparent);
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 8px 24px rgba(0, 0, 0, 0.38),
+    0 0 20px var(--cat-soft, transparent),
+    0 0 0 1px var(--cat-line, transparent);
 }
 
-/* 签名细节：左侧分类色带 */
-/* 签名细节：左侧色带 —— 每条资料自己的颜色，是最醒目的识别标记 */
+/* 签名细节：左侧发光色带 —— 每条资料自己的霓虹色 */
 .card::before {
   content: "";
   position: absolute;
@@ -800,9 +810,11 @@ button, input, textarea { font: inherit; color: inherit; }
   left: 0;
   width: 4px;
   background: var(--cat, var(--raised-2));
+  box-shadow: 0 0 10px var(--cat-line, transparent);
   opacity: 0.95;
   transition: width var(--t-fast) var(--ease),
-              opacity var(--t-fast) var(--ease);
+              opacity var(--t-fast) var(--ease),
+              box-shadow var(--t-mid) var(--ease);
 }
 
 .card:hover::before {
@@ -905,7 +917,26 @@ button, input, textarea { font: inherit; color: inherit; }
   white-space: nowrap;
 }
 
-.status-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+.status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* 处理中的状态点会呼吸，让"正在工作"看得见 */
+.status[data-status="pending"] .status-dot,
+.status[data-status="fetching"] .status-dot,
+.status[data-status="analyzing"] .status-dot {
+  animation: pulse 1.6s var(--ease) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.45; transform: scale(0.82); }
+}
+
 .status[data-status="done"] { color: var(--ok); }
 .status[data-status="failed"] { color: var(--err); }
 .status[data-status="pending"],
