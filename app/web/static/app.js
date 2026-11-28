@@ -1,0 +1,897 @@
+/* ============================================================
+   AI Insight Hub — 前端逻辑
+   原生 JS，零依赖，零构建。
+   安全约定：任何来自接口的字符串一律用 textContent 写入 DOM，
+   全文不使用 innerHTML，从根上杜绝 XSS。
+   ============================================================ */
+
+(function () {
+  "use strict";
+
+  /* ── 常量 ─────────────────────────────────────────── */
+
+  var SEARCH_DEBOUNCE = 250;      // 文档 §8.7：搜索防抖 250ms
+  var STATUS_TEXT = {
+    pending: "排队中",
+    fetching: "抓取中",
+    analyzing: "分析中",
+    done: "已完成",
+    failed: "失败"
+  };
+
+  // 分类 → 色带。色相只出现在卡片左侧 3px 细条上，不进背景。
+  var CATEGORY_HUE = {
+    "技术/编程": "#5978b8",
+    "安全/CTF": "#b87070",
+    "产品/设计": "#a97ba8",
+    "学习/教程": "#5f9e86",
+    "生活/效率": "#b39557",
+    "其他": "#6e6e75"
+  };
+
+  /* ── DOM ──────────────────────────────────────────── */
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  var el = {
+    stats: $("stats"),
+    categories: $("categories"),
+    tags: $("tags"),
+    modelDot: $("model-dot"),
+    modelName: $("model-name"),
+    modelProvider: $("model-provider"),
+    pageTitle: $("page-title"),
+    pageMeta: $("page-meta"),
+    compose: $("compose"),
+    composeForm: $("compose-form"),
+    composeInput: $("compose-input"),
+    composeError: $("compose-error"),
+    submitCompose: $("submit-compose"),
+    search: $("search"),
+    activeFilters: $("active-filters"),
+    list: $("list"),
+    empty: $("empty"),
+    emptyTitle: $("empty-title"),
+    emptyText: $("empty-text"),
+    modal: $("modal"),
+    modalPanel: $("modal-panel"),
+    modalNo: $("modal-no"),
+    modalBody: $("modal-body"),
+    toast: $("toast")
+  };
+
+  /* ── 状态 ─────────────────────────────────────────── */
+
+  var state = {
+    q: "",
+    category: "",
+    tag: "",
+    items: [],
+    categories: [],
+    tags: [],
+    config: null,
+    busy: false,
+    lastFocus: null
+  };
+
+  /* ── 小工具 ───────────────────────────────────────── */
+
+  function pad4(n) {
+    var s = String(n == null ? 0 : n);
+    while (s.length < 4) { s = "0" + s; }
+    return s;
+  }
+
+  function recordNo(id) { return "#" + pad4(id); }
+
+  function categoryHue(cat) {
+    return CATEGORY_HUE[cat] || CATEGORY_HUE["其他"];
+  }
+
+  // 后端时间形如 "2026-11-27 03:23:50"（SQLite CURRENT_TIMESTAMP，UTC）
+  function formatTime(value) {
+    if (!value) { return "–"; }
+    var iso = String(value).replace(" ", "T");
+    if (iso.indexOf("Z") < 0 && iso.indexOf("+") < 0) { iso += "Z"; }
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) { return String(value); }
+    var mm = String(d.getMonth() + 1);
+    var dd = String(d.getDate());
+    var hh = String(d.getHours());
+    var mi = String(d.getMinutes());
+    if (mm.length < 2) { mm = "0" + mm; }
+    if (dd.length < 2) { dd = "0" + dd; }
+    if (hh.length < 2) { hh = "0" + hh; }
+    if (mi.length < 2) { mi = "0" + mi; }
+    return d.getFullYear() + "-" + mm + "-" + dd + " " + hh + ":" + mi;
+  }
+
+  function truncate(text, max) {
+    var s = String(text == null ? "" : text);
+    if (s.length <= max) { return s; }
+    return s.slice(0, max) + "…";
+  }
+
+  // 文档 §7.3：错误统一从 detail 取；本项目后端用的是 error，两个都兼容
+  function errorText(body, fallback) {
+    if (body && typeof body === "object") {
+      if (typeof body.detail === "string" && body.detail) { return body.detail; }
+      if (typeof body.error === "string" && body.error) { return body.error; }
+    }
+    if (typeof body === "string" && body.trim()) { return body.trim(); }
+    return fallback || "请求失败";
+  }
+
+  /* ── 提示条 ───────────────────────────────────────── */
+
+  var toastTimer = null;
+
+  function toast(message, kind) {
+    if (!el.toast) { return; }
+    el.toast.textContent = message;
+    el.toast.dataset.kind = kind === "error" ? "error" : "info";
+    el.toast.hidden = false;
+    // 先显示再切 data-show，保证 transition 生效
+    void el.toast.offsetWidth;
+    el.toast.dataset.show = "true";
+    if (toastTimer) { clearTimeout(toastTimer); }
+    toastTimer = setTimeout(function () {
+      el.toast.dataset.show = "false";
+      toastTimer = setTimeout(function () {
+        el.toast.hidden = true;
+        toastTimer = null;
+      }, 220);
+    }, kind === "error" ? 4200 : 2600);
+  }
+
+  /* ── 网络 ─────────────────────────────────────────── */
+
+  function request(url, options) {
+    return fetch(url, options).then(function (res) {
+      // 204：无响应体，不能调 json()
+      if (res.status === 204) {
+        return { ok: res.ok, status: res.status, body: null };
+      }
+      return res.text().then(function (text) {
+        var body = null;
+        if (text) {
+          try { body = JSON.parse(text); } catch (e) { body = text; }
+        }
+        return { ok: res.ok, status: res.status, body: body };
+      });
+    });
+  }
+
+  /* ── 渲染：统计 ───────────────────────────────────── */
+
+  function renderStats(data) {
+    var fields = ["total", "done", "failed", "categories", "tags"];
+    fields.forEach(function (key) {
+      var node = el.stats.querySelector('[data-stat="' + key + '"]');
+      if (!node) { return; }
+      var value = data && typeof data[key] === "number" ? data[key] : 0;
+      node.textContent = String(value);
+      node.dataset.zero = value === 0 ? "true" : "false";
+    });
+  }
+
+  /* ── 渲染：分面（分类 / 标签） ─────────────────────── */
+
+  function renderFacets(listNode, rows, activeValue, onPick) {
+    listNode.textContent = "";
+
+    var all = document.createElement("li");
+    var allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.className = "facet";
+    allBtn.setAttribute("aria-pressed", activeValue === "" ? "true" : "false");
+
+    var allName = document.createElement("span");
+    allName.className = "facet-name";
+    allName.textContent = "全部";
+    allBtn.appendChild(allName);
+
+    allBtn.addEventListener("click", function () { onPick(""); });
+    all.appendChild(allBtn);
+    listNode.appendChild(all);
+
+    (rows || []).forEach(function (row) {
+      var li = document.createElement("li");
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "facet";
+      btn.setAttribute("aria-pressed", row.name === activeValue ? "true" : "false");
+      btn.title = row.name;
+
+      var name = document.createElement("span");
+      name.className = "facet-name";
+      name.textContent = row.name;
+
+      var count = document.createElement("span");
+      count.className = "facet-count";
+      count.textContent = String(row.count);
+
+      btn.appendChild(name);
+      btn.appendChild(count);
+      btn.addEventListener("click", function () { onPick(row.name); });
+
+      li.appendChild(btn);
+      listNode.appendChild(li);
+    });
+  }
+
+  function renderCategories() {
+    renderFacets(el.categories, state.categories, state.category, function (value) {
+      state.category = value === state.category ? "" : value;
+      loadItems();
+    });
+  }
+
+  function renderTags() {
+    renderFacets(el.tags, state.tags, state.tag, function (value) {
+      state.tag = value === state.tag ? "" : value;
+      loadItems();
+    });
+  }
+
+  /* ── 渲染：当前筛选项提示 ─────────────────────────── */
+
+  function renderActiveFilters() {
+    el.activeFilters.textContent = "";
+
+    var chips = [];
+    if (state.category) { chips.push({ kind: "category", label: "分类：" + state.category }); }
+    if (state.tag) { chips.push({ kind: "tag", label: "标签：" + state.tag }); }
+
+    chips.forEach(function (chip) {
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "chip";
+
+      var text = document.createElement("span");
+      text.textContent = chip.label;
+
+      var icon = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      icon.setAttribute("class", "ico");
+      icon.setAttribute("aria-hidden", "true");
+      var use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+      use.setAttribute("href", "#i-close");
+      icon.appendChild(use);
+
+      btn.appendChild(text);
+      btn.appendChild(icon);
+      btn.addEventListener("click", function () {
+        if (chip.kind === "category") { state.category = ""; }
+        if (chip.kind === "tag") { state.tag = ""; }
+        loadItems();
+      });
+
+      el.activeFilters.appendChild(btn);
+    });
+  }
+
+  /* ── 渲染：标题与计数 ─────────────────────────────── */
+
+  function renderHead() {
+    var title = "全部资料";
+    if (state.category && state.tag) {
+      title = state.category + " · " + state.tag;
+    } else if (state.category) {
+      title = state.category;
+    } else if (state.tag) {
+      title = "标签 · " + state.tag;
+    }
+    el.pageTitle.textContent = title;
+
+    var count = state.items.length;
+    var meta = "共 " + count + " 条";
+    if (state.q) { meta += "，搜索「" + state.q + "」"; }
+    el.pageMeta.textContent = meta;
+  }
+
+  /* ── 渲染：列表 ───────────────────────────────────── */
+
+  function buildCard(item, index) {
+    var li = document.createElement("li");
+
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "card";
+    btn.dataset.status = item.status || "pending";
+    btn.style.setProperty("--cat", categoryHue(item.category));
+    btn.style.animationDelay = Math.min(index, 6) * 40 + "ms";
+
+    // 顶部：标题 + 档案编号
+    var top = document.createElement("div");
+    top.className = "card-top";
+
+    var title = document.createElement("h3");
+    title.className = "card-title";
+    if (item.title && item.title.trim()) {
+      title.textContent = item.title;
+    } else {
+      title.textContent = "（未生成标题）";
+      title.classList.add("card-title--muted");
+    }
+
+    var no = document.createElement("span");
+    no.className = "record-no";
+    no.textContent = recordNo(item.id);
+
+    top.appendChild(title);
+    top.appendChild(no);
+    btn.appendChild(top);
+
+    // 摘要
+    var summary = document.createElement("p");
+    summary.className = "card-summary";
+    var summaryText = item.summary && item.summary.trim()
+      ? item.summary
+      : (item.content ? truncate(item.content, 120) : "暂无摘要");
+    summary.textContent = summaryText;
+    btn.appendChild(summary);
+
+    // 底部：分类 + 标签 + 状态
+    var foot = document.createElement("div");
+    foot.className = "card-foot";
+
+    var tagsWrap = document.createElement("div");
+    tagsWrap.className = "card-tags";
+
+    if (item.category) {
+      var cat = document.createElement("span");
+      cat.className = "tag tag--cat";
+      cat.textContent = item.category;
+      tagsWrap.appendChild(cat);
+    }
+
+    var tags = Array.isArray(item.tags) ? item.tags.slice(0, 4) : [];
+    tags.forEach(function (t) {
+      if (!t) { return; }
+      var tag = document.createElement("span");
+      tag.className = "tag";
+      tag.textContent = t;
+      tagsWrap.appendChild(tag);
+    });
+
+    if (tags.length < (Array.isArray(item.tags) ? item.tags.length : 0)) {
+      var more = document.createElement("span");
+      more.className = "tag";
+      more.textContent = "+" + (item.tags.length - tags.length);
+      tagsWrap.appendChild(more);
+    }
+
+    foot.appendChild(tagsWrap);
+
+    var spacer = document.createElement("span");
+    spacer.className = "card-spacer";
+    foot.appendChild(spacer);
+
+    var st = document.createElement("span");
+    st.className = "status";
+    st.dataset.status = item.status || "pending";
+    var dot = document.createElement("span");
+    dot.className = "status-dot";
+    st.appendChild(dot);
+    st.appendChild(document.createTextNode(STATUS_TEXT[item.status] || item.status || "未知"));
+    foot.appendChild(st);
+
+    btn.appendChild(foot);
+
+    // 失败原因
+    if (item.status === "failed" && item.error) {
+      var err = document.createElement("p");
+      err.className = "card-error";
+      err.textContent = truncate(item.error, 160);
+      err.title = item.error;
+      btn.appendChild(err);
+    }
+
+    btn.addEventListener("click", function () { openDetail(item.id); });
+
+    li.appendChild(btn);
+    return li;
+  }
+
+  function renderList() {
+    el.list.textContent = "";
+
+    if (!state.items.length) {
+      el.empty.hidden = false;
+      el.emptyTitle.textContent = state.q || state.category || state.tag
+        ? "没有匹配的资料"
+        : "还没有资料";
+      el.emptyText.textContent = state.q || state.category || state.tag
+        ? "换个关键词，或清除筛选条件再试"
+        : "贴一个网址或一段文本，系统会抓取正文并生成摘要、标签和分类";
+      return;
+    }
+
+    el.empty.hidden = true;
+
+    var frag = document.createDocumentFragment();
+    state.items.forEach(function (item, i) {
+      frag.appendChild(buildCard(item, i));
+    });
+    el.list.appendChild(frag);
+  }
+
+  /* ── 渲染：整页 ───────────────────────────────────── */
+
+  function renderAll() {
+    renderHead();
+    renderActiveFilters();
+    renderList();
+  }
+
+  /* ── 数据加载 ─────────────────────────────────────── */
+
+  function loadItems() {
+    var params = new URLSearchParams();
+    if (state.q) { params.set("q", state.q); }
+    if (state.category) { params.set("category", state.category); }
+    if (state.tag) { params.set("tag", state.tag); }
+    params.set("limit", "200");
+
+    return request("/api/items?" + params.toString())
+      .then(function (res) {
+        if (!res.ok) {
+          throw new Error(errorText(res.body, "加载列表失败"));
+        }
+        state.items = Array.isArray(res.body) ? res.body : [];
+        renderAll();
+      })
+      .catch(function (err) {
+        toast(err.message || "加载列表失败", "error");
+      });
+  }
+
+  function loadFacets() {
+    // allSettled：统计 / 分类 / 标签 三路互不拖累，任一失败不影响其余渲染
+    return Promise.allSettled([
+      request("/api/stats"),
+      request("/api/categories"),
+      request("/api/tags?limit=60")
+    ]).then(function (results) {
+      var settled = function (i) {
+        return results[i] && results[i].status === "fulfilled" ? results[i].value : null;
+      };
+
+      var stats = settled(0);
+      if (stats && stats.ok) { renderStats(stats.body); }
+
+      var cats = settled(1);
+      if (cats && cats.ok) {
+        state.categories = Array.isArray(cats.body) ? cats.body : [];
+      }
+      renderCategories();
+
+      var tags = settled(2);
+      if (tags && tags.ok) {
+        state.tags = Array.isArray(tags.body) ? tags.body : [];
+      } else {
+        // 后端 limit 无默认值时可能 422，降级为不显示标签，不影响主流程
+        state.tags = [];
+      }
+      renderTags();
+
+      if (!stats || !stats.ok) {
+        toast("统计信息加载失败", "error");
+      }
+    });
+  }
+
+  function loadConfig() {
+    return request("/api/config").then(function (res) {
+      if (!res.ok) { return; }
+      var llm = (res.body && res.body.llm) || {};
+      state.config = llm;
+
+      el.modelName.textContent = llm.model || "未知模型";
+
+      var isMock = llm.provider === "mock";
+      el.modelDot.dataset.live = isMock ? "false" : "true";
+      el.modelProvider.textContent = isMock
+        ? "规则模拟 · 未接真实模型"
+        : (llm.provider || "") + (llm.has_key === false ? " · 缺少 Key" : "");
+      if (isMock) { el.modelProvider.dataset.mock = "true"; }
+      el.modelName.title = "provider: " + (llm.provider || "?");
+    }).catch(function () {
+      el.modelName.textContent = "配置读取失败";
+    });
+  }
+
+  function refreshAll() {
+    return Promise.all([loadItems(), loadFacets()]);
+  }
+
+  /* ── 录入 ─────────────────────────────────────────── */
+
+  function clearCompose() {
+    el.composeInput.value = "";
+    el.composeError.hidden = true;
+    el.composeError.textContent = "";
+  }
+
+  function setComposeBusy(busy) {
+    state.busy = busy;
+    el.submitCompose.disabled = busy;
+    el.submitCompose.textContent = busy ? "分析中…" : "开始分析";
+  }
+
+  function submitCompose() {
+    var raw = el.composeInput.value.trim();
+
+    el.composeError.hidden = true;
+    el.composeError.textContent = "";
+
+    if (!raw) {
+      el.composeError.textContent = "请先输入网址或文本";
+      el.composeError.hidden = false;
+      el.composeInput.focus();
+      return;
+    }
+    if (state.busy) { return; }
+
+    // 文档：url 和 text 二选一，由后端判断是不是链接，这里按形态分流
+    var isUrl = /^https?:\/\/\S+$/i.test(raw);
+    var payload = isUrl ? { url: raw } : { text: raw };
+
+    setComposeBusy(true);
+
+    request("/api/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload)
+    }).then(function (res) {
+      if (res.status === 201) {
+        toast("已入库并完成分析");
+        clearCompose();
+        return refreshAll();
+      }
+      if (res.status === 422) {
+        // 已入库但分析失败 —— 必须刷新列表，让用户看到失败条目（文档 §7.2）
+        toast("已入库，但分析失败：" + errorText(res.body, "未知原因"), "error");
+        clearCompose();
+        return refreshAll();
+      }
+      if (res.status === 400) {
+        el.composeError.textContent = errorText(res.body, "输入不合法");
+        el.composeError.hidden = false;
+        return null;
+      }
+      throw new Error(errorText(res.body, "提交失败（HTTP " + res.status + "）"));
+    }).catch(function (err) {
+      el.composeError.textContent = err.message || "提交失败";
+      el.composeError.hidden = false;
+    }).then(function () {
+      setComposeBusy(false);
+    });
+  }
+
+  /* ── 详情弹层 ─────────────────────────────────────── */
+
+  function metaCell(key, value, isLink) {
+    var cell = document.createElement("div");
+    cell.className = "meta-cell";
+
+    var k = document.createElement("span");
+    k.className = "meta-key";
+    k.textContent = key;
+
+    var v = document.createElement("span");
+    v.className = "meta-val";
+
+    if (isLink && value) {
+      var a = document.createElement("a");
+      a.href = value;
+      a.textContent = value;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      v.appendChild(a);
+    } else {
+      v.textContent = value || "–";
+    }
+
+    cell.appendChild(k);
+    cell.appendChild(v);
+    return cell;
+  }
+
+  function sectionLabel(text) {
+    var h = document.createElement("h4");
+    h.className = "section-label";
+    h.textContent = text;
+    return h;
+  }
+
+  function buildDetail(item) {
+    // 统一清理：正文区与操作区都由本函数独占重建，
+    // 调用方不需要（也不应该）自己 remove，避免中途抛异常留下半空弹层
+    el.modalBody.textContent = "";
+    var staleActions = el.modalPanel.querySelector(".modal-actions");
+    if (staleActions) { staleActions.remove(); }
+
+    el.modalNo.textContent = recordNo(item.id);
+
+    // 标题 + 摘要
+    var head = document.createElement("div");
+    var title = document.createElement("h3");
+    title.className = "detail-title";
+    title.id = "modal-title";
+    title.textContent = item.title && item.title.trim() ? item.title : "（未生成标题）";
+    head.appendChild(title);
+
+    if (item.summary && item.summary.trim()) {
+      var summary = document.createElement("p");
+      summary.className = "detail-summary";
+      summary.textContent = item.summary;
+      head.appendChild(summary);
+    }
+    el.modalBody.appendChild(head);
+
+    // 失败原因
+    if (item.status === "failed" && item.error) {
+      var err = document.createElement("p");
+      err.className = "detail-error";
+      err.textContent = "分析失败：" + item.error;
+      el.modalBody.appendChild(err);
+    }
+
+    // 元信息
+    var metaSection = document.createElement("div");
+    metaSection.className = "detail-section";
+    metaSection.appendChild(sectionLabel("元信息"));
+
+    var grid = document.createElement("div");
+    grid.className = "meta-grid";
+    grid.appendChild(metaCell("状态", STATUS_TEXT[item.status] || item.status || "未知"));
+    grid.appendChild(metaCell("分类", item.category));
+    grid.appendChild(metaCell("模型", item.model));
+    grid.appendChild(metaCell("创建", formatTime(item.create_at)));
+    grid.appendChild(metaCell("更新", formatTime(item.update_at)));
+    if (item.url) {
+      grid.appendChild(metaCell("来源链接", item.url, true));
+    }
+    metaSection.appendChild(grid);
+    el.modalBody.appendChild(metaSection);
+
+    // 标签
+    var tags = Array.isArray(item.tags) ? item.tags.filter(Boolean) : [];
+    var keywords = Array.isArray(item.keywords) ? item.keywords.filter(Boolean) : [];
+
+    if (tags.length) {
+      var tagSection = document.createElement("div");
+      tagSection.className = "detail-section";
+      tagSection.appendChild(sectionLabel("标签"));
+      var tagWrap = document.createElement("div");
+      tagWrap.className = "card-tags";
+      tags.forEach(function (t) {
+        var span = document.createElement("span");
+        span.className = "tag";
+        span.textContent = t;
+        tagWrap.appendChild(span);
+      });
+      tagSection.appendChild(tagWrap);
+      el.modalBody.appendChild(tagSection);
+    }
+
+    if (keywords.length) {
+      var kwSection = document.createElement("div");
+      kwSection.className = "detail-section";
+      kwSection.appendChild(sectionLabel("关键词"));
+      var kwWrap = document.createElement("div");
+      kwWrap.className = "card-tags";
+      keywords.forEach(function (k) {
+        var span = document.createElement("span");
+        span.className = "tag";
+        span.textContent = k;
+        kwWrap.appendChild(span);
+      });
+      kwSection.appendChild(kwWrap);
+      el.modalBody.appendChild(kwSection);
+    }
+
+    // 正文
+    var contentSection = document.createElement("div");
+    contentSection.className = "detail-section";
+    contentSection.appendChild(sectionLabel("正文"));
+    var content = document.createElement("pre");
+    content.className = "detail-content";
+    content.textContent = item.content && item.content.trim() ? item.content : "（无正文）";
+    contentSection.appendChild(content);
+    el.modalBody.appendChild(contentSection);
+
+    // 操作
+    var actions = document.createElement("div");
+    actions.className = "modal-actions";
+
+    var del = document.createElement("button");
+    del.type = "button";
+    del.className = "btn btn--danger";
+    del.textContent = "删除";
+    del.addEventListener("click", function () { removeItem(item); });
+
+    var spacer = document.createElement("span");
+    spacer.className = "spacer";
+
+    var re = document.createElement("button");
+    re.type = "button";
+    re.className = "btn";
+    re.textContent = "重新分析";
+    re.addEventListener("click", function () { reanalyze(item.id, re); });
+
+    actions.appendChild(del);
+    actions.appendChild(spacer);
+    actions.appendChild(re);
+
+    el.modalPanel.appendChild(actions);
+  }
+
+  function openDetail(id) {
+    state.lastFocus = document.activeElement;
+
+    request("/api/items/" + encodeURIComponent(id)).then(function (res) {
+      if (!res.ok) {
+        toast(errorText(res.body, "条目不存在"), "error");
+        return;
+      }
+      buildDetail(res.body);
+      el.modal.hidden = false;
+      el.modalPanel.focus();
+    }).catch(function () {
+      toast("打开详情失败", "error");
+    });
+  }
+
+  function closeModal() {
+    el.modal.hidden = true;
+    var oldActions = el.modalPanel.querySelector(".modal-actions");
+    if (oldActions) { oldActions.remove(); }
+    el.modalBody.textContent = "";
+
+    // 还原焦点：原节点可能已被删除/重绘，只有仍在文档里才聚焦，
+    // 否则回落到搜索框，避免焦点丢到 body 上
+    var target = state.lastFocus;
+    state.lastFocus = null;
+    if (target && target.isConnected && typeof target.focus === "function") {
+      target.focus();
+    } else if (el.search) {
+      el.search.focus();
+    }
+  }
+
+  /* ── 删除 ─────────────────────────────────────────── */
+
+  function removeItem(item) {
+    var label = item.title && item.title.trim() ? item.title : recordNo(item.id);
+    if (!window.confirm("删除「" + truncate(label, 40) + "」？此操作不可撤销。")) {
+      return;
+    }
+
+    request("/api/items/" + encodeURIComponent(item.id), { method: "DELETE" })
+      .then(function (res) {
+        if (res.status === 204 || res.ok) {
+          toast("已删除");
+          closeModal();
+          return refreshAll();
+        }
+        if (res.status === 404) {
+          toast("条目已不存在", "error");
+          closeModal();
+          return refreshAll();
+        }
+        throw new Error(errorText(res.body, "删除失败"));
+      })
+      .catch(function (err) {
+        toast(err.message || "删除失败", "error");
+      });
+  }
+
+  /* ── 重新分析 ─────────────────────────────────────── */
+
+  function reanalyze(id, button) {
+    button.disabled = true;
+    var original = button.textContent;
+    button.textContent = "分析中…";
+
+    request("/api/items/" + encodeURIComponent(id) + "/reanalyze", { method: "POST" })
+      .then(function (res) {
+        if (res.status === 404) {
+          toast("条目已不存在", "error");
+          closeModal();
+          return refreshAll();
+        }
+        if (res.status === 422) {
+          toast("重新分析失败：" + errorText(res.body, "未知原因"), "error");
+          return refreshAll().then(function () {
+            closeModal();
+          });
+        }
+        if (!res.ok) {
+          throw new Error(errorText(res.body, "重新分析失败"));
+        }
+        toast("已重新分析");
+        // 用返回的新数据重绘详情（buildDetail 自带清理），再刷新列表
+        if (res.body && typeof res.body === "object") {
+          buildDetail(res.body);
+        }
+        return refreshAll();
+      })
+      .catch(function (err) {
+        toast(err.message || "重新分析失败", "error");
+      })
+      .then(function () {
+        button.disabled = false;
+        button.textContent = original;
+      });
+  }
+
+  /* ── 事件绑定 ─────────────────────────────────────── */
+
+  var searchTimer = null;
+
+  el.search.addEventListener("input", function () {
+    if (searchTimer) { clearTimeout(searchTimer); }
+    searchTimer = setTimeout(function () {
+      searchTimer = null;
+      state.q = el.search.value.trim();
+      loadItems();
+    }, SEARCH_DEBOUNCE);
+  });
+
+  el.composeForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    submitCompose();
+  });
+
+  el.composeInput.addEventListener("keydown", function (event) {
+    if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+      event.preventDefault();
+      submitCompose();
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      clearCompose();
+      el.composeInput.blur();
+    }
+  });
+
+  // 点遮罩或关闭按钮关弹层
+  el.modal.addEventListener("click", function (event) {
+    if (event.target.closest("[data-close]")) { closeModal(); }
+  });
+
+  // Esc 关弹层；弹层内 Tab 限制在面板内
+  document.addEventListener("keydown", function (event) {
+    if (el.modal.hidden) { return; }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeModal();
+      return;
+    }
+    if (event.key !== "Tab") { return; }
+
+    var focusables = el.modalPanel.querySelectorAll(
+      'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    );
+    if (!focusables.length) { return; }
+
+    var first = focusables[0];
+    var last = focusables[focusables.length - 1];
+
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  });
+
+  /* ── 启动 ─────────────────────────────────────────── */
+
+  loadConfig();
+  refreshAll();
+
+})();

@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Insight Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- 图标集：lucide 线稿，统一 16px / 1.5 stroke -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></symbol>
+    <symbol id="i-link" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></symbol>
+    <symbol id="i-tag" viewBox="0 0 24 24"><path d="M3 12V5a2 2 0 0 1 2-2h7l9 9-9 9-9-9Z"/><circle cx="8" cy="8" r="1.2"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="m12 3 9 5-9 5-9-5 9-5Z"/><path d="m3 13 9 5 9-5"/></symbol>
+    <symbol id="i-alert" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16.5v.01"/></symbol>
+    <symbol id="i-file" viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8l-5-5Z"/><path d="M14 3v5h5"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+
+  <!-- ── 侧栏 ─────────────────────────────────────────── -->
+  <aside class="sidebar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">AI</div>
+      <div class="brand-text">
+        <span class="brand-name">Insight Hub</span>
+        <span class="brand-sub">个人资料库</span>
+      </div>
+    </div>
+
+    <section class="side-section">
+      <h2 class="side-label">统计</h2>
+      <dl class="stats" id="stats">
+        <div class="stat"><dt>条目</dt><dd data-stat="total">–</dd></div>
+        <div class="stat"><dt>已完成</dt><dd data-stat="done">–</dd></div>
+        <div class="stat"><dt>失败</dt><dd data-stat="failed">–</dd></div>
+        <div class="stat"><dt>分类</dt><dd data-stat="categories">–</dd></div>
+        <div class="stat"><dt>标签</dt><dd data-stat="tags">–</dd></div>
+      </dl>
+    </section>
+
+    <section class="side-section">
+      <h2 class="side-label">分类</h2>
+      <ul class="facets" id="categories"></ul>
+    </section>
+
+    <section class="side-section side-section--grow">
+      <h2 class="side-label">标签</h2>
+      <ul class="facets facets--cloud" id="tags"></ul>
+    </section>
+
+    <div class="side-foot">
+      <div class="model-row">
+        <span class="model-dot" id="model-dot" aria-hidden="true"></span>
+        <span class="model-name" id="model-name">–</span>
+      </div>
+      <span class="model-provider" id="model-provider"></span>
+    </div>
+  </aside>
+
+  <!-- ── 主区 ─────────────────────────────────────────── -->
+  <main class="main">
+
+    <header class="main-head">
+      <div class="head-text">
+        <h1 class="page-title" id="page-title">全部资料</h1>
+        <p class="page-meta" id="page-meta">–</p>
+      </div>
+    </header>
+
+    <!-- 录入：常驻在右侧主区顶部（文档 §8.7 要求输入框在右侧） -->
+    <section class="compose" id="compose">
+      <form class="compose-form" id="compose-form" novalidate>
+        <div class="compose-top">
+          <label class="compose-label" for="compose-input">网址或文本</label>
+          <span class="compose-hint">Ctrl + Enter 提交</span>
+        </div>
+        <textarea
+          id="compose-input"
+          class="textarea"
+          rows="2"
+          placeholder="粘贴一个 https:// 链接，或直接贴一段文字"
+        ></textarea>
+        <div class="compose-foot">
+          <p class="form-error" id="compose-error" role="alert" hidden></p>
+          <div class="compose-actions">
+            <button class="btn btn--primary" type="submit" id="submit-compose">开始分析</button>
+          </div>
+        </div>
+      </form>
+    </section>
+
+    <!-- 搜索栏 -->
+    <div class="toolbar">
+      <div class="search">
+        <svg class="ico search-ico" aria-hidden="true"><use href="#i-search"/></svg>
+        <input type="search" id="search" class="search-input" placeholder="搜索标题、摘要、正文" autocomplete="off">
+      </div>
+      <div class="filters" id="active-filters"></div>
+    </div>
+
+    <!-- 列表 -->
+    <section class="list-wrap">
+      <ul class="card-list" id="list"></ul>
+      <div class="empty" id="empty" hidden>
+        <svg class="ico ico--lg" aria-hidden="true"><use href="#i-file"/></svg>
+        <p class="empty-title" id="empty-title">还没有资料</p>
+        <p class="empty-text" id="empty-text">贴一个网址或一段文本，系统会抓取正文并生成摘要、标签和分类</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- ── 详情弹层 ──────────────────────────────────────── -->
+<div class="modal" id="modal" hidden>
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1" id="modal-panel">
+    <div class="modal-head">
+      <span class="record-no" id="modal-no"></span>
+      <button class="icon-btn" type="button" data-close aria-label="关闭">
+        <svg class="ico" aria-hidden="true"><use href="#i-close"/></svg>
+      </button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>
