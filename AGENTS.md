@@ -41,7 +41,9 @@ This is a single package, not a monorepo. No nested `AGENTS.md` files apply yet;
 ## Commit workflow (user-mandated)
 
 - 每次提交前，agent 先检查仓库状态：`git status --short --branch`、`git diff --stat`、`git diff`（必要时看未跟踪文件），报告已修改 / 新增 / 删除 / 未跟踪 / 未推送的内容。
-- agent 不自行 `git add` / `git commit`：只把拟用的提交说明（commit message）文本交给用户，由用户确认后自行执行提交。
+- 用户明确表示要提交（如"提交"、"commit 一次"、"帮我提交"）时，agent 负责总结本次改动、执行 `git add` 与 `git commit`，并向用户回报提交结果（`git log` / `git status`）。
+- 用户未明确要求提交时，agent 不得自行 `git add` / `git commit`；此时只在检查仓库状态后把拟用的提交说明文本交给用户参考。
+- 暂存范围与提交拆分方式（单次提交 / 按模块拆多个提交）需与用户确认后再执行；拆分时要保证每个提交自身可运行，或在提交说明里写明中间态不可用。
 - 提交说明用中文，沿用现有风格：`feat(scope): ...` / `fix(scope): ...` / `refactor(scope): ...` / `docs: ...`，一行概括改动，跨模块改动在正文分条列出。
 - 提交前确认生成物与工具产物是否入库（`.venv/`、`*.db`、`__pycache__/`、`ai_insight_hub.egg-info/`、`.agents/`、`skills-lock.json` 等），默认不入库，需用户决定。
 - 发现 `CONTEXT.md` 与实际代码不一致时，先指出不一致，由用户决定是否在提交前同步文档。
