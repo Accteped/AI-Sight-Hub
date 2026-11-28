@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>阅读 — AI Insight Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/vendor/katex.min.css">
+<link rel="stylesheet" href="/static/style.css">
+<link rel="stylesheet" href="/static/article.css">
+</head>
+<body class="reader-body">
+
+<!-- 图标集：lucide 线稿，与主页同一套 -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-arrow-left" viewBox="0 0 24 24"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></symbol>
+  </defs>
+</svg>
+
+<header class="reader-bar">
+  <a class="reader-back" href="/" id="back-link">
+    <svg class="ico" aria-hidden="true"><use href="#i-arrow-left"/></svg>
+    返回列表
+  </a>
+  <div class="reader-bar-right">
+    <span class="record-no" id="reader-no"></span>
+    <span class="status" id="reader-status"></span>
+  </div>
+</header>
+
+<main class="reader" id="reader">
+  <div class="reader-head">
+    <h1 class="reader-title" id="reader-title">载入中</h1>
+    <p class="reader-summary" id="reader-summary" hidden></p>
+
+    <div class="reader-meta" id="reader-meta"></div>
+  </div>
+
+  <div class="reader-tags" id="reader-tags" hidden></div>
+
+  <article class="markdown" id="content"></article>
+</main>
+
+<div class="reader-foot">
+  <div class="reader-foot-inner">
+    <span id="foot-model"></span>
+    <button class="btn btn--ghost" type="button" id="toggle-raw">显示原文</button>
+  </div>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script src="/static/vendor/marked.min.js"></script>
+<script src="/static/vendor/katex.min.js"></script>
+<script src="/static/vendor/auto-render.min.js"></script>
+<script src="/static/article.js"></script>
+</body>
+</html>

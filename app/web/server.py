@@ -1,6 +1,9 @@
+from pathlib import Path
+
 from fastapi import FastAPI
+from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from fastapi.responses import JSONResponse,Response
 
 from ..config import Config
 from ..llm.client import build_client
@@ -8,6 +11,10 @@ from ..store import Store
 from ..pipeline import ingest, analyze
 
 app = FastAPI()
+#静态挂载和根路径
+STATIC_DIR = Path(__file__).parent / "static"
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
 store = Store("test.db", "TEST")
 client = build_client(Config())
 
@@ -19,7 +26,7 @@ class ItemCreate(BaseModel):
 
 @app.get("/")
 def home():
-    return {"hello": "AI Insight Hub"}
+    return FileResponse(STATIC_DIR / "index.html")
 
 @app.get("/api/config")
 def list_config():
@@ -39,7 +46,7 @@ def categories():
     return store.categories()
 
 @app.get("/api/tags")
-def get_tags(limit: int):
+def get_tags(limit: int = 60):
     return (store.tags())[:limit]
 
 @app.get("/api/items/{item_id}")

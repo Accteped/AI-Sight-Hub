@@ -84,8 +84,35 @@
 
   function recordNo(id) { return "#" + pad4(id); }
 
+  // 阅读页地址：新标签页打开，渲染 Markdown + LaTeX
+  function articleUrl(id) {
+    return "/static/article.html?id=" + encodeURIComponent(id);
+  }
+
   function categoryHue(cat) {
     return CATEGORY_HUE[cat] || CATEGORY_HUE["其他"];
+  }
+
+  // 标签清洗：mock 模式会把原文切片当标签，需过滤代码/公式残片
+  var NOISE_TAG = /[\\${}#|`^*_\[\]<>()=;,]/;
+
+  function cleanTag(t) {
+    var s = String(t == null ? "" : t).replace(/\s+/g, " ").trim();
+    if (!s) { return ""; }
+    if (NOISE_TAG.test(s)) { return ""; }
+    if (s.length < 2 || s.length > 24) { return ""; }
+    if (!/[\u4e00-\u9fa5]|[A-Za-z]{2,}/.test(s)) { return ""; }
+    return s;
+  }
+
+  function cleanTags(raw) {
+    var out = [];
+    if (!Array.isArray(raw)) { return out; }
+    raw.forEach(function (t) {
+      var c = cleanTag(t);
+      if (c && out.indexOf(c) < 0) { out.push(c); }
+    });
+    return out;
   }
 
   // 后端时间形如 "2026-11-27 03:23:50"（SQLite CURRENT_TIMESTAMP，UTC）
@@ -104,6 +131,22 @@
     if (hh.length < 2) { hh = "0" + hh; }
     if (mi.length < 2) { mi = "0" + mi; }
     return d.getFullYear() + "-" + mm + "-" + dd + " " + hh + ":" + mi;
+  }
+
+  // 摘要清洗：原文是 Markdown 时，模型生成的摘要会带语法符号
+  function stripInlineMarkdown(s) {
+    return String(s == null ? "" : s)
+      .replace(/```[\s\S]*?```/g, " ")
+      .replace(/\$\$[\s\S]*?\$\$/g, " ")
+      .replace(/`[^`]*`/g, " ")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/\*([^*]+)\*/g, "$1")
+      .replace(/__([^_]+)__/g, "$1")
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/\[([^\]]*)\]\([^)]*\)/g, "$1")
+      .replace(/^\s*[-*+]\s+/gm, "")
+      .replace(/\s+/g, " ")
+      .trim();
   }
 
   function truncate(text, max) {
@@ -170,6 +213,15 @@
       var node = el.stats.querySelector('[data-stat="' + key + '"]');
       if (!node) { return; }
       var value = data && typeof data[key] === "number" ? data[key] : 0;
+
+      // 标签数用清洗后的口径，避免显示 187 但侧栏只列出几十个的割裂感
+      if (key === "tags" && state.tags.length) {
+        var cleanCount = state.tags.filter(function (row) {
+          return row && row.name && cleanTag(row.name);
+        }).length;
+        value = cleanCount;
+      }
+
       node.textContent = String(value);
       node.dataset.zero = value === 0 ? "true" : "false";
     });
@@ -228,7 +280,14 @@
   }
 
   function renderTags() {
-    renderFacets(el.tags, state.tags, state.tag, function (value) {
+    // 标签云只展示通过清洗的词，避免大量碎片标签（mock 模式常见）
+    var cleaned = [];
+    state.tags.forEach(function (row) {
+      if (!row || !row.name) { return; }
+      if (!cleanTag(row.name)) { return; }
+      cleaned.push(row);
+    });
+    renderFacets(el.tags, cleaned, state.tag, function (value) {
       state.tag = value === state.tag ? "" : value;
       loadItems();
     });
@@ -294,9 +353,12 @@
   function buildCard(item, index) {
     var li = document.createElement("li");
 
-    var btn = document.createElement("button");
-    btn.type = "button";
+    // 用 <a> 而不是 <button>：支持右键"在新标签页打开"和中键点击
+    var btn = document.createElement("a");
     btn.className = "card";
+    btn.href = articleUrl(item.id);
+    btn.target = "_blank";
+    btn.rel = "noopener";
     btn.dataset.status = item.status || "pending";
     btn.style.setProperty("--cat", categoryHue(item.category));
     btn.style.animationDelay = Math.min(index, 6) * 40 + "ms";
@@ -326,8 +388,8 @@
     var summary = document.createElement("p");
     summary.className = "card-summary";
     var summaryText = item.summary && item.summary.trim()
-      ? item.summary
-      : (item.content ? truncate(item.content, 120) : "暂无摘要");
+      ? stripInlineMarkdown(item.summary)
+      : (item.content ? truncate(stripInlineMarkdown(item.content), 120) : "暂无摘要");
     summary.textContent = summaryText;
     btn.appendChild(summary);
 
@@ -345,19 +407,19 @@
       tagsWrap.appendChild(cat);
     }
 
-    var tags = Array.isArray(item.tags) ? item.tags.slice(0, 4) : [];
+    var allTags = cleanTags(item.tags);
+    var tags = allTags.slice(0, 4);
     tags.forEach(function (t) {
-      if (!t) { return; }
       var tag = document.createElement("span");
       tag.className = "tag";
       tag.textContent = t;
       tagsWrap.appendChild(tag);
     });
 
-    if (tags.length < (Array.isArray(item.tags) ? item.tags.length : 0)) {
+    if (tags.length < allTags.length) {
       var more = document.createElement("span");
       more.className = "tag";
-      more.textContent = "+" + (item.tags.length - tags.length);
+      more.textContent = "+" + (allTags.length - tags.length);
       tagsWrap.appendChild(more);
     }
 
@@ -387,9 +449,23 @@
       btn.appendChild(err);
     }
 
-    btn.addEventListener("click", function () { openDetail(item.id); });
-
+    // 新标签页打开是 <a target=_blank> 的原生行为，无需额外监听
     li.appendChild(btn);
+
+    // 快速操作：删除 / 重新分析（放在卡片外层，避免 <a> 内嵌 <button> 的非法结构）
+    var quick = document.createElement("button");
+    quick.type = "button";
+    quick.className = "card-quick";
+    quick.setAttribute("aria-label", "更多操作");
+    quick.title = "删除 / 重新分析";
+    quick.textContent = "⋯";
+    quick.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      openDetail(item.id);
+    });
+    li.appendChild(quick);
+
     return li;
   }
 
@@ -457,9 +533,6 @@
         return results[i] && results[i].status === "fulfilled" ? results[i].value : null;
       };
 
-      var stats = settled(0);
-      if (stats && stats.ok) { renderStats(stats.body); }
-
       var cats = settled(1);
       if (cats && cats.ok) {
         state.categories = Array.isArray(cats.body) ? cats.body : [];
@@ -474,6 +547,10 @@
         state.tags = [];
       }
       renderTags();
+
+      // 放在渲染标签之后：标签数要用清洗后的口径
+      var stats = settled(0);
+      if (stats && stats.ok) { renderStats(stats.body); }
 
       if (!stats || !stats.ok) {
         toast("统计信息加载失败", "error");
@@ -625,7 +702,7 @@
     if (item.summary && item.summary.trim()) {
       var summary = document.createElement("p");
       summary.className = "detail-summary";
-      summary.textContent = item.summary;
+      summary.textContent = stripInlineMarkdown(item.summary);
       head.appendChild(summary);
     }
     el.modalBody.appendChild(head);
