@@ -33,6 +33,14 @@ class Store:
             print(f"Error creating table: {e}")
         conn.commit()
         conn.close()
+    #把json安全解析成list
+    def _to_list(self, text):
+        value = []
+        try:
+            value = json.loads(text) if text else []
+        except (json.JSONDecodeError, TypeError):
+            return []
+        return value if isinstance(value,list) else []
     #新增一条行
     def add(self, title = '', summary = '', content = '', url = '', model = '', provider = '', category = '其他', status='pending', keywords='[]', tags = '[]', error=None, source=None):
         conn_a = sqlite3.connect(self.db_path)
@@ -54,24 +62,15 @@ class Store:
             conn_g.row_factory = sqlite3.Row
             cursor = conn_g.execute(f"SELECT * FROM {self.dbtb_name} WHERE id=?", (id,))
             row = cursor.fetchone()
-            if row:
-                rows = dict(row)
-                try:
-                    rows["tags"] = json.loads(rows["tags"]) if rows["tags"] else []
-                except json.JSONDecodeError:
-                    rows["tags"] = []
-                try:
-                    rows["keywords"] = json.loads(rows["keywords"]) if rows["keywords"] else []
-                except json.JSONDecodeError:
-                    rows["keywords"] = []
-                record = dict(rows)
-            else:
-                record = None
-        except sqlite3.Error as e:
-            print(f"Error retrieving record: {e}")
-            record = None
-        conn_g.close()
-        return record
+            if not row:
+                return None
+            rows = dict(row)
+            rows["keywords"] = self._to_list(rows["keywords"])
+            rows["tags"] = self._to_list(rows["tags"])
+            record = dict(rows)
+            return record
+        finally:
+            conn_g.close()
     #按照条件查询，传入参数为q、category、tag、limit，返回符合条件的记录列表
     def list(self, q, category, tag, limit):
         conn_l = sqlite3.connect(self.db_path)
@@ -96,20 +95,12 @@ class Store:
             records = []
             for row in cursor.fetchall():
                 rows = dict(row)
-                try:
-                    rows["tags"] = json.loads(rows["tags"]) if rows["tags"] else []
-                except json.JSONDecodeError:
-                    rows["tags"] = []
-                try:
-                    rows["keywords"] = json.loads(rows["keywords"]) if rows["keywords"] else []
-                except json.JSONDecodeError:
-                    rows["keywords"] = []
+                rows["keywords"] = self._to_list(rows["keywords"])
+                rows["tags"] = self._to_list(rows["tags"])
                 records.append(dict(rows))
-        except sqlite3.Error as e:
-            print(f"Error listing records: {e}")
-            records = []
-        conn_l.close()
-        return records
+            return records
+        finally:
+            conn_l.close()
     #更新状态，传入参数为id、status、error
     def set_status(self, id, status, error=None):
         conn_s = sqlite3.connect(self.db_path)
@@ -118,19 +109,17 @@ class Store:
                 conn_s.execute(f"UPDATE {self.dbtb_name} SET status=?, error=? WHERE id=?", (status, error, id))
             else:
                 conn_s.execute(f"UPDATE {self.dbtb_name} SET status=?, error=? WHERE id=?", (status, None, id))
-        except sqlite3.Error as e:
-            print(f"Error updating status: {e}")
-        conn_s.commit()
-        conn_s.close()
+            conn_s.commit()
+        finally:
+            conn_s.close()
     #保存内容和标题，传入参数为id、content、title
     def save_content(self, id, content, title):
         conn_save = sqlite3.connect(self.db_path)
         try:
             conn_save.execute(f"UPDATE {self.dbtb_name} SET content=?, title=? WHERE id=?", (content, title, id))
-        except sqlite3.Error as e:
-            print(f"Error saving content: {e}")
-        conn_save.commit()
-        conn_save.close()
+            conn_save.commit()
+        finally:
+            conn_save.close()
     #进行对应的分析结果更新，传入参数为id、analysis对象、provider、model
     def apply_analysis(self, id, analysis, provider, model):
         conn_apply = sqlite3.connect(self.db_path)
@@ -139,27 +128,23 @@ class Store:
         try:
             conn_apply.execute(f"UPDATE {self.dbtb_name} SET title=?, summary=?, model=?, provider=?, category=?, keywords=?, tags=?, error=?, status=?, update_at=CURRENT_TIMESTAMP WHERE id=?",
                                 (analysis.title, analysis.summary,model, provider, analysis.category, keywords, tags, None, "done", id))
-        except sqlite3.Error as e:
-            print(f"Error applying analysis: {e}")
-        conn_apply.commit()
-        conn_apply.close()
+            conn_apply.commit()
+        finally:
+            conn_apply.close()
     #删除对应行
     def delete(self, id):
         conn_d = sqlite3.connect(self.db_path)
+        change = 0
         #注意删除不存在的id不会抛异常，所以不能在外面无条件把stat定为True
         #判断方法：看execute返回的游标行是不是0
-        stat = True
         try:
-            conn_d.execute(f"DELETE FROM {self.dbtb_name} WHERE id=?", (id,))
+            cursor = conn_d.execute(f"DELETE FROM {self.dbtb_name} WHERE id=?", (id,))
             #如果没有删除任何行，说明id不存在，返回False
-            if conn_d.total_changes == 0:
-                stat = False
-        except sqlite3.Error as e:
-            print(f"Error deleting record: {e}")
-            stat = False
-        conn_d.commit()
-        conn_d.close()
-        return stat
+            change = cursor.rowcount
+            conn_d.commit()
+        finally:
+            conn_d.close()
+        return change > 0
     #统计类别数，返回格式为[{"name": "category1", "count": count1}, {"name": "category2", "count": count2}, ...]
     def categories(self):
         #连接数据库，获取所有记录的category字段
@@ -205,12 +190,7 @@ class Store:
         #统计标签数量
         tag_count = {}
         for row in rows:
-            try:
-                tags = json.loads(row['tags'])
-            except json.JSONDecodeError:
-                tags = []
-            except TypeError:
-                tags = []
+            tags = self._to_list(row["tags"])
             for tag in tags:
                 if tag in tag_count:
                     tag_count[tag] += 1

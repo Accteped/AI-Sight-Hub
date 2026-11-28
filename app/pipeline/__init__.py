@@ -22,7 +22,7 @@ SYSTEM_PROMPT = """你是一个专业的资料整理助手。请阅读用户提�
 def ingest(store, source, client, titles=None):
     #避免出现创建一个没有内容的数据
     if not source or not source.strip():
-        raise ValueError("输入为空")
+        raise ValueError('输入为空')
     status = "pending"
     item_id = store.add(status=status)
     try:
@@ -39,22 +39,22 @@ def ingest(store, source, client, titles=None):
     except Exception as e:
         store.set_status(id=item_id, status="failed", error=str(e)[:500])      
         return (item_id,422)
-    return (item_id,status)
+    return status
 
 def analyze(store, item_id, client):
     try:
         item = store.get(item_id)
         if item is None:
-            return 404
+            return (item_id,404)
         if not item["content"]:
-            return 400
+            return (item_id,400)
         store.set_status(id= item_id, status = "analyzing")
         content = client.json(SYSTEM_PROMPT, item["content"])
 
         analysis = app.models.Analysis(**content)
 
         store.apply_analysis(item_id, analysis, client.name, client.model)
-        return 201
+        return (item_id, 201)
     except Exception as e:
         store.set_status(id=item_id, status="failed", error=str(e)[:500])      
-        return 422
+        return (item_id, 422)

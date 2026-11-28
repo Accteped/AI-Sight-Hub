@@ -1,5 +1,6 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
+from fastapi.responses import JSONResponse,Response
 
 from ..config import Config
 from ..llm.client import build_client
@@ -45,19 +46,31 @@ def get_tags(limit: int):
 def get_item(item_id: int):
     item = store.get(item_id)
     if item is None:
-        return {"error": "not found"}, 404
+        return JSONResponse(content={"error": "not found"}, status_code=404)
     return item
 
 @app.post("/api/items")
 def create_item(payload: ItemCreate):
     source = payload.url or payload.text
-    item_id, code = ingest(store, source, client)
-    return store.get(item_id), code
 
-@app.post("/api/items/{id}/reanalyze")
-def reanalyze(id: int):
-    item = store.get(id)
+    if not source or not source.strip():
+        return JSONResponse(content='输入为空',status_code=400)
+
+    item_id, code = ingest(store, source, client)
+ 
+    return JSONResponse(content=store.get(item_id), status_code=code)
+
+@app.post("/api/items/{item_id}/reanalyze")
+def reanalyze(item_id: int):
+    item = store.get(item_id)
     if item is None:
-        return {"error": "not found"}, 404
-    status = analyze(store, id, client)
-    return item, status
+        return JSONResponse(content={"error": "not found"}, status_code=404)
+    temp_id, status = analyze(store, item_id, client)
+    return JSONResponse(content=store.get(temp_id), status_code=status)
+
+@app.delete("/api/items/{item_id}")
+def delete(item_id: int):
+    stats = store.delete(item_id)
+    if not stats:
+        return JSONResponse(content={"error": "not found"}, status_code=404)
+    return Response(status_code=204)
