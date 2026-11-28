@@ -10,6 +10,20 @@
   flex-direction: column;
 }
 
+/* 与主页一致的光晕层，让阅读页不是一块死板深色 */
+.reader-body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(760px 420px at 8% -10%, rgba(99, 179, 238, 0.11), transparent 58%),
+    radial-gradient(620px 360px at 96% -6%, rgba(139, 139, 240, 0.075), transparent 56%);
+}
+
+.reader-body > * { position: relative; z-index: 1; }
+
 /* ── 顶部条 ───────────────────────────────────────── */
 
 .reader-bar {
@@ -113,8 +127,8 @@
 
 .markdown {
   font-size: 16px;
-  line-height: 1.75;
-  color: var(--text-2);
+  line-height: 1.8;
+  color: #c8d0dd;
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
@@ -251,8 +265,8 @@
   white-space: pre-wrap;
   font-family: inherit;
   font-size: 15px;
-  line-height: 1.75;
-  color: var(--text-2);
+  line-height: 1.8;
+  color: #c8d0dd;
   overflow-wrap: break-word;
 }
 
