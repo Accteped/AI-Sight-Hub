@@ -246,6 +246,16 @@
   padding: 4px 0;
 }
 
+/* ── 纯文本正文：保留原始换行与缩进，但用正文字体 ──── */
+.markdown.is-plain {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.75;
+  color: var(--text-2);
+  overflow-wrap: break-word;
+}
+
 /* ── 原始文本模式 ─────────────────────────────────── */
 
 .markdown.is-raw {

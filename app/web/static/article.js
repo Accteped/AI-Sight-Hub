@@ -135,13 +135,40 @@
     }
   }
 
+  // 粗略判断内容是否含 Markdown 结构。
+  // 纯文本（如网页正文抽取结果）如果按 Markdown 渲染，
+  // 原有的换行和缩进会被吃掉，代码块会变成普通段落。
+  function looksLikeMarkdown(text) {
+    if (!text) { return false; }
+    // 只需要命中少量明确信号即可，宁少勿多
+    var signals = [
+      /^#{1,6}\s+\S/m,          // 标题
+      /```/,                     // 代码围栏
+      /^\s*[-*+]\s+\S/m,         // 无序列表
+      /^\s*\d+\.\s+\S/m,         // 有序列表
+      /^\s*>\s+\S/m,             // 引用
+      /\*\*[^*\n]+\*\*/,         // 粗体
+      /\[[^\]\n]+\]\([^)\n]+\)/, // 链接
+      /^\|.*\|.*$/m              // 表格
+    ];
+    var hits = 0;
+    for (var i = 0; i < signals.length; i++) {
+      if (signals[i].test(text)) { hits++; }
+    }
+    return hits >= 2;
+  }
+
   function renderMarkdown(text) {
-    if (typeof marked === "undefined") {
-      // 库没加载成功时降级为纯文本，不白屏
-      el.content.classList.add("is-raw");
+    if (typeof marked === "undefined" || !looksLikeMarkdown(text)) {
+      // 库缺失或内容本身不是 Markdown：按纯文本保留换行与缩进，
+      // 公式仍然单独排版
+      el.content.classList.add("is-plain");
       el.content.textContent = text;
+      renderMath();
       return;
     }
+
+    el.content.classList.remove("is-plain");
 
     el.content.classList.remove("is-raw");
 

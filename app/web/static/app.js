@@ -66,7 +66,8 @@
     q: "",
     category: "",
     tag: "",
-    items: [],
+    status: "done",          // done | failed | all，默认只看已完成
+    items: [],               // 后端返回的全部条目
     categories: [],
     tags: [],
     config: null,
@@ -131,6 +132,11 @@
     if (hh.length < 2) { hh = "0" + hh; }
     if (mi.length < 2) { mi = "0" + mi; }
     return d.getFullYear() + "-" + mm + "-" + dd + " " + hh + ":" + mi;
+  }
+
+  // 把换行/连续空白压成单个空格：网页抓来的标题常带 \n，会破坏单行布局
+  function oneLine(s) {
+    return String(s == null ? "" : s).replace(/\s+/g, " ").trim();
   }
 
   // 摘要清洗：原文是 Markdown 时，模型生成的摘要会带语法符号
@@ -210,20 +216,23 @@
   function renderStats(data) {
     var fields = ["total", "done", "failed", "categories", "tags"];
     fields.forEach(function (key) {
-      var node = el.stats.querySelector('[data-stat="' + key + '"]');
-      if (!node) { return; }
+      // 主统计区与隐藏的 dl 里同名 data-stat 节点一起写
+      var nodes = document.querySelectorAll('[data-stat="' + key + '"]');
+      if (!nodes.length) { return; }
+
       var value = data && typeof data[key] === "number" ? data[key] : 0;
 
       // 标签数用清洗后的口径，避免显示 187 但侧栏只列出几十个的割裂感
       if (key === "tags" && state.tags.length) {
-        var cleanCount = state.tags.filter(function (row) {
+        value = state.tags.filter(function (row) {
           return row && row.name && cleanTag(row.name);
         }).length;
-        value = cleanCount;
       }
 
-      node.textContent = String(value);
-      node.dataset.zero = value === 0 ? "true" : "false";
+      for (var i = 0; i < nodes.length; i++) {
+        nodes[i].textContent = String(value);
+        nodes[i].dataset.zero = value === 0 ? "true" : "false";
+      }
     });
   }
 
@@ -331,6 +340,14 @@
 
   /* ── 渲染：标题与计数 ─────────────────────────────── */
 
+  // 按当前状态筛选，返回可见条目
+  function visibleItems() {
+    if (state.status === "all") { return state.items; }
+    return state.items.filter(function (item) {
+      return (item.status || "") === state.status;
+    });
+  }
+
   function renderHead() {
     var title = "全部资料";
     if (state.category && state.tag) {
@@ -342,10 +359,21 @@
     }
     el.pageTitle.textContent = title;
 
-    var count = state.items.length;
-    var meta = "共 " + count + " 条";
-    if (state.q) { meta += "，搜索「" + state.q + "」"; }
-    el.pageMeta.textContent = meta;
+    var shown = visibleItems().length;
+    var total = state.items.length;
+    var parts = [];
+
+    if (state.status === "done") {
+      parts.push("已完成 " + shown + " 条");
+      if (total > shown) { parts.push("另有 " + (total - shown) + " 条未显示"); }
+    } else if (state.status === "failed") {
+      parts.push("失败 " + shown + " 条");
+    } else {
+      parts.push("共 " + total + " 条");
+    }
+    if (state.q) { parts.push("搜索「" + state.q + "」"); }
+
+    el.pageMeta.textContent = parts.join(" · ");
   }
 
   /* ── 渲染：列表 ───────────────────────────────────── */
@@ -369,8 +397,10 @@
 
     var title = document.createElement("h3");
     title.className = "card-title";
-    if (item.title && item.title.trim()) {
-      title.textContent = item.title;
+    var titleText = oneLine(item.title);
+    if (titleText) {
+      title.textContent = titleText;
+      title.title = titleText;
     } else {
       title.textContent = "（未生成标题）";
       title.classList.add("card-title--muted");
@@ -384,14 +414,27 @@
     top.appendChild(no);
     btn.appendChild(top);
 
-    // 摘要
-    var summary = document.createElement("p");
-    summary.className = "card-summary";
-    var summaryText = item.summary && item.summary.trim()
-      ? stripInlineMarkdown(item.summary)
-      : (item.content ? truncate(stripInlineMarkdown(item.content), 120) : "暂无摘要");
-    summary.textContent = summaryText;
-    btn.appendChild(summary);
+    var isFailed = item.status === "failed";
+
+    // 摘要：失败条目不再用错误文本顶替摘要，避免一屏全是英文报错
+    if (isFailed) {
+      var errLine = document.createElement("p");
+      errLine.className = "card-summary card-summary--error";
+      errLine.textContent = item.error
+        ? truncate(String(item.error).replace(/\s+/g, " "), 110)
+        : "分析失败，没有记录原因";
+      btn.appendChild(errLine);
+    } else {
+      var summary = document.createElement("p");
+      summary.className = "card-summary";
+      var summaryText = item.summary && item.summary.trim()
+        ? stripInlineMarkdown(item.summary)
+        : (item.content
+            ? truncate(stripInlineMarkdown(item.content), 120)
+            : "暂无摘要");
+      summary.textContent = oneLine(summaryText);
+      btn.appendChild(summary);
+    }
 
     // 底部：分类 + 标签 + 状态
     var foot = document.createElement("div");
@@ -440,15 +483,6 @@
 
     btn.appendChild(foot);
 
-    // 失败原因
-    if (item.status === "failed" && item.error) {
-      var err = document.createElement("p");
-      err.className = "card-error";
-      err.textContent = truncate(item.error, 160);
-      err.title = item.error;
-      btn.appendChild(err);
-    }
-
     // 新标签页打开是 <a target=_blank> 的原生行为，无需额外监听
     li.appendChild(btn);
 
@@ -483,10 +517,28 @@
       return;
     }
 
+    var items = visibleItems();
+
+    if (!items.length) {
+      el.empty.hidden = false;
+      var hasFailed = state.items.some(function (it) { return it.status === "failed"; });
+      if (state.status === "failed") {
+        el.emptyTitle.textContent = "没有失败的条目";
+        el.emptyText.textContent = "所有资料都分析成功了";
+      } else if (state.status === "done" && hasFailed) {
+        el.emptyTitle.textContent = "没有已完成的条目";
+        el.emptyText.textContent = "切到「失败」看看哪些需要重新分析";
+      } else {
+        el.emptyTitle.textContent = "没有匹配的资料";
+        el.emptyText.textContent = "换个关键词，或清除筛选条件再试";
+      }
+      return;
+    }
+
     el.empty.hidden = true;
 
     var frag = document.createDocumentFragment();
-    state.items.forEach(function (item, i) {
+    items.forEach(function (item, i) {
       frag.appendChild(buildCard(item, i));
     });
     el.list.appendChild(frag);
@@ -567,11 +619,22 @@
       el.modelName.textContent = llm.model || "未知模型";
 
       var isMock = llm.provider === "mock";
-      el.modelDot.dataset.live = isMock ? "false" : "true";
-      el.modelProvider.textContent = isMock
-        ? "规则模拟 · 未接真实模型"
-        : (llm.provider || "") + (llm.has_key === false ? " · 缺少 Key" : "");
-      if (isMock) { el.modelProvider.dataset.mock = "true"; }
+      var noKey = llm.has_key === false;
+
+      // 状态点：真实模型=绿、mock=黄、缺 Key=红
+      el.modelDot.dataset.live = (!isMock && !noKey) ? "true" : "false";
+      el.modelDot.dataset.warn = (isMock || noKey) ? "true" : "false";
+
+      if (isMock) {
+        el.modelProvider.textContent = "规则模拟";
+        el.modelProvider.dataset.mock = "true";
+      } else if (noKey) {
+        el.modelProvider.textContent = "未配置 Key";
+        el.modelProvider.dataset.mock = "true";
+      } else {
+        el.modelProvider.textContent = "真实模型";
+        el.modelProvider.dataset.mock = "false";
+      }
       el.modelName.title = "provider: " + (llm.provider || "?");
     }).catch(function () {
       el.modelName.textContent = "配置读取失败";
@@ -586,6 +649,7 @@
 
   function clearCompose() {
     el.composeInput.value = "";
+    el.composeInput.style.height = "";
     el.composeError.hidden = true;
     el.composeError.textContent = "";
   }
@@ -917,15 +981,52 @@
     }, SEARCH_DEBOUNCE);
   });
 
+  // 状态筛选：纯前端切换，不重新请求
+  var statusFilter = $("status-filter");
+  if (statusFilter) {
+    statusFilter.addEventListener("click", function (event) {
+      var btn = event.target.closest(".segment");
+      if (!btn) { return; }
+      var next = btn.dataset.status;
+      if (!next || next === state.status) { return; }
+      state.status = next;
+
+      var segments = statusFilter.querySelectorAll(".segment");
+      for (var i = 0; i < segments.length; i++) {
+        segments[i].setAttribute(
+          "aria-pressed",
+          segments[i].dataset.status === next ? "true" : "false"
+        );
+      }
+      renderAll();
+    });
+  }
+
   el.composeForm.addEventListener("submit", function (event) {
     event.preventDefault();
     submitCompose();
   });
 
+  // 输入框随内容自动长高，空时保持单行
+  function autoGrow() {
+    var node = el.composeInput;
+    node.style.height = "auto";
+    node.style.height = Math.min(node.scrollHeight, 200) + "px";
+  }
+
+  el.composeInput.addEventListener("input", autoGrow);
+
   el.composeInput.addEventListener("keydown", function (event) {
+    // 没有修饰键时回车即提交（单行输入的习惯），Shift+Enter 换行
+    if (event.key === "Enter" && !event.shiftKey && !event.ctrlKey && !event.metaKey) {
+      event.preventDefault();
+      submitCompose();
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
       event.preventDefault();
       submitCompose();
+      return;
     }
     if (event.key === "Escape") {
       event.preventDefault();

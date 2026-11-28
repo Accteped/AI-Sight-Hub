@@ -39,15 +39,31 @@
       </div>
     </div>
 
-    <section class="side-section">
-      <h2 class="side-label">统计</h2>
-      <dl class="stats" id="stats">
-        <div class="stat"><dt>条目</dt><dd data-stat="total">–</dd></div>
-        <div class="stat"><dt>已完成</dt><dd data-stat="done">–</dd></div>
-        <div class="stat"><dt>失败</dt><dd data-stat="failed">–</dd></div>
-        <div class="stat"><dt>分类</dt><dd data-stat="categories">–</dd></div>
-        <div class="stat"><dt>标签</dt><dd data-stat="tags">–</dd></div>
-      </dl>
+    <!-- 主统计：总条目数是这一屏唯一的大数字 -->
+    <section class="side-hero">
+      <div class="hero-figure">
+        <span class="hero-number" data-stat="total">–</span>
+        <span class="hero-label">条资料</span>
+      </div>
+      <div class="hero-split">
+        <div class="split-item">
+          <span class="split-number" data-stat="done">–</span>
+          <span class="split-label">已完成</span>
+        </div>
+        <div class="split-item">
+          <span class="split-number" data-stat="failed">–</span>
+          <span class="split-label">失败</span>
+        </div>
+        <div class="split-item">
+          <span class="split-number" data-stat="categories">–</span>
+          <span class="split-label">分类</span>
+        </div>
+        <div class="split-item">
+          <span class="split-number" data-stat="tags">–</span>
+          <span class="split-label">标签</span>
+        </div>
+      </div>
+      <dl class="stats" id="stats" hidden></dl>
     </section>
 
     <section class="side-section">
@@ -79,26 +95,22 @@
       </div>
     </header>
 
-    <!-- 录入：常驻在右侧主区顶部（文档 §8.7 要求输入框在右侧） -->
+    <!-- 录入：紧凑单行，聚焦/多行时自动展开 -->
     <section class="compose" id="compose">
       <form class="compose-form" id="compose-form" novalidate>
-        <div class="compose-top">
-          <label class="compose-label" for="compose-input">网址或文本</label>
-          <span class="compose-hint">Ctrl + Enter 提交</span>
-        </div>
         <textarea
           id="compose-input"
           class="textarea"
-          rows="2"
-          placeholder="粘贴一个 https:// 链接，或直接贴一段文字"
+          rows="1"
+          placeholder="粘贴网址，或输入要归档的文本…"
+          aria-label="网址或文本"
         ></textarea>
-        <div class="compose-foot">
-          <p class="form-error" id="compose-error" role="alert" hidden></p>
-          <div class="compose-actions">
-            <button class="btn btn--primary" type="submit" id="submit-compose">开始分析</button>
-          </div>
-        </div>
+        <button class="btn btn--primary compose-submit" type="submit" id="submit-compose">分析</button>
       </form>
+      <div class="compose-meta">
+        <p class="form-error" id="compose-error" role="alert" hidden></p>
+        <span class="compose-hint" id="compose-hint">Enter 提交 · Shift+Enter 换行</span>
+      </div>
     </section>
 
     <!-- 搜索栏 -->
@@ -107,6 +119,14 @@
         <svg class="ico search-ico" aria-hidden="true"><use href="#i-search"/></svg>
         <input type="search" id="search" class="search-input" placeholder="搜索标题、摘要、正文" autocomplete="off">
       </div>
+
+      <!-- 状态筛选：默认只看已完成，失败条目收在开关后面 -->
+      <div class="segmented" id="status-filter" role="group" aria-label="按状态筛选">
+        <button type="button" class="segment" data-status="done" aria-pressed="true">已完成</button>
+        <button type="button" class="segment" data-status="failed" aria-pressed="false">失败</button>
+        <button type="button" class="segment" data-status="all" aria-pressed="false">全部</button>
+      </div>
+
       <div class="filters" id="active-filters"></div>
     </div>
 
