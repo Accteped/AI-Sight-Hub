@@ -76,36 +76,98 @@ class MockClient(LLMClient):
 class OpenAICompatClient(LLMClient):
     name = 'openai-compat'
     model = None
+
     def __init__(self, config):
         self.config = config
         self.model = config.LLM_MODEL
+
+    def _extract_error(self, respond):
+        """从错误响应里提取可读信息。
+
+        优先取 {"error": {"message": ...}}；失败则退回原始文本。
+        无论哪条路径都要剔除 api key 片段，避免写进数据库再显示到前端。
+        """
+        detail = ''
+        try:
+            body = respond.json()
+        except Exception:
+            body = None
+
+        if isinstance(body, dict):
+            err = body.get('error')
+            if isinstance(err, dict):
+                detail = str(err.get('message') or err.get('code') or '')
+            elif err:
+                detail = str(err)
+            if not detail:
+                detail = str(body.get('message') or '')
+
+        if not detail:
+            detail = respond.text[:200]
+
+        # 服务端会回显 key 的后几位，如 "Your api key: ****460d is invalid"
+        detail = re.sub(r'\*{2,}\S*', '****', detail)
+        return detail.strip()[:200]
+
     def complete(self, system, user, temperature=None):
         if not self.config.LLM_API_KEY:
-                    raise ValueError("请先配置API KEY")
+            raise ValueError("请先配置 LLM_API_KEY（在 .env 中填写）")
+
         if temperature is None:
             temperature = self.config.LLM_TEMPERATURE
+
         url = self.config.LLM_BASE_URL.rstrip('/') + '/chat/completions'
-        model = self.model
-        respond = httpx.post(url,
-                headers={'Authorization': f'Bearer {self.config.LLM_API_KEY}'},
-                json={'model': model,
-                    'messages': [
-                        {'role': 'system', 'content': system},
-                        {'role': 'user', 'content': user}],
-                    'temperature': temperature},
-                timeout=self.config.LLM_TIMEOUT)
-        if respond.status_code >= 400:
-            error = respond.text[:500]
-            raise RuntimeError(f"调用模型失败({respond.status_code}) : {error}")
-        text = respond.json()
+
         try:
-            choices = text["choices"][0]["message"]
-            content = choices.get("content", None)
-        except Exception as e:
-            content = None
-        if not content:
-            raise ValueError(f"模型返回内容为空或不存在需要内容{respond.json()}，状态码:{respond.status_code}")
+            respond = httpx.post(
+                url,
+                headers={'Authorization': f'Bearer {self.config.LLM_API_KEY}'},
+                json={'model': self.model,
+                      'messages': [
+                          {'role': 'system', 'content': system},
+                          {'role': 'user', 'content': user}],
+                      'temperature': temperature},
+                timeout=self.config.LLM_TIMEOUT)
+        # 子类必须写在父类前面，否则永远不会被捕获
+        except httpx.TimeoutException:
+            raise RuntimeError(
+                f'模型响应超时（{self.config.LLM_TIMEOUT:g} 秒），文本可能过长或网络较慢')
+        except httpx.ConnectError:
+            raise RuntimeError(
+                f'无法连接模型服务，请检查 LLM_BASE_URL：{self.config.LLM_BASE_URL}')
+        except httpx.HTTPError as e:
+            raise RuntimeError(f'网络请求失败：{e}')
+
+        if respond.status_code >= 400:
+            raise RuntimeError(
+                f'调用模型失败({respond.status_code})：{self._extract_error(respond)}')
+
+        try:
+            data = respond.json()
+        except Exception:
+            raise ValueError(f'模型响应不是合法 JSON，状态码 {respond.status_code}')
+
+        if not isinstance(data, dict):
+            raise ValueError(f'模型响应结构异常，期望对象，实际 {type(data).__name__}')
+
+        choices = data.get('choices')
+        if not isinstance(choices, list) or not choices:
+            raise ValueError('模型响应中没有 choices，可能是内容被安全策略拦截')
+
+        message = choices[0].get('message') if isinstance(choices[0], dict) else None
+        if not isinstance(message, dict):
+            raise ValueError('模型响应中 choices[0].message 结构异常')
+
+        # 达到长度上限时 JSON 必然被截断，提前给出准确提示
+        if choices[0].get('finish_reason') == 'length':
+            raise ValueError('模型输出被截断（达到 max_tokens），请缩短输入文本')
+
+        content = message.get('content')
+        if not isinstance(content, str) or not content.strip():
+            raise ValueError('模型返回内容为空')
+
         return content
+
 #本地模型类
 class OllamaClient(LLMClient):
     def __init__(self, config):
