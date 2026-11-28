@@ -23,7 +23,9 @@ AI Insight Hub (AgentForNotes): paste a URL or text, then crawl it, have an LLM 
 
 - Install: `.\.venv\Scripts\python.exe -m pip install -e .`
 - Run a module check from the repo root, e.g. `.\.venv\Scripts\python.exe -m app.llm.client` (use `-m` form so relative imports work)
-- Run dev server: `.\.venv\Scripts\python.exe -m uvicorn app.web.server:app --reload --port 8000` — note `app/web/server.py` and the FastAPI wiring do not exist yet; `main.py` is a throwaway demo, not the app entry point.
+- Run dev server: `.\.venv\Scripts\python.exe -m uvicorn app.web.server:app --reload --port 8000` — `app/web/server.py` is the FastAPI app and the real entry point (it hardcodes `Store("test.db", "TEST")`). `main.py` was removed.
+- Smoke test: `.\.venv\Scripts\python.exe -m scripts.smoke_test` (also works as `python scripts\smoke_test.py` because the package is installed editable). It prints expected values rather than asserting, and writes to the shared `test.db`.
+- Verify API behavior with `fastapi.testclient.TestClient` (installed via fastapi) — pass `raise_server_exceptions=False` when you want to see the real 500 instead of the exception propagating into your script.
 - Tests: not set up. `pytest` is not installed and `tests/` does not exist yet. Known commands: see `AI-Insight-Hub-开发文档.md` sections 11 and 12.
 - Lint/Format/Typecheck: none configured.
 
@@ -36,6 +38,7 @@ This is a single package, not a monorepo. No nested `AGENTS.md` files apply yet;
 - Implement stages in the order given in `AI-Insight-Hub-开发文档.md` section 11; each stage must run before the next begins.
 - `LLM_PROVIDER=mock` needs no API key and no network. Keep that path working — it is the default for development and tests.
 - The API contract in doc section 7 is binding: a failed analysis returns HTTP 422 *with the item body*, and `get()`/`list()` return dicts (see `CONTEXT.md` section 5 for the columns actually in use).
+- FastAPI does **not** support Flask's `return data, status_code` tuple convention — a returned tuple is serialized as the response body and the status stays 200. Set status codes explicitly via `JSONResponse(content=..., status_code=...)` or `Response(status_code=...)`. This was a real bug (all endpoints returned 200) and is now fixed; do not reintroduce it.
 - `CONTEXT.md` is the running memory: update it when a stage completes, a decision changes, or a new pitfall is found.
 
 ## Commit workflow (user-mandated)
